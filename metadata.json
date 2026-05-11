@@ -1,0 +1,6 @@
+{
+  "name": "Paroisse Lecteurs",
+  "description": "Application mobile de gestion des lecteurs de paroisse : planification assistée, suivi des formations, présences multi-paroisses et interface apaisante.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
