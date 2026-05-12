@@ -20,7 +20,7 @@ export const generateReaderStatsPDF = (
   // Header
   doc.setFontSize(22);
   doc.setTextColor(245, 158, 11); // Accent color
-  doc.text('Paroissia - Rapport Individuel', 20, 20);
+  doc.text('Leitourghia - Rapport Individuel', 20, 20);
   
   doc.setFontSize(12);
   doc.setTextColor(100);
@@ -124,7 +124,7 @@ export const generateGlobalStatsPDF = (
 
   doc.setFontSize(22);
   doc.setTextColor(245, 158, 11);
-  doc.text('Paroissia - Statistiques Globales', 20, 20);
+  doc.text('Leitourghia - Statistiques Globales', 20, 20);
   
   doc.setFontSize(12);
   doc.setTextColor(100);
@@ -221,7 +221,7 @@ export const generatePlanningPDF = (
 
   doc.setFontSize(22);
   doc.setTextColor(245, 158, 11);
-  doc.text('Paroissia - Planning Liturgique', 20, 20);
+  doc.text('Leitourghia - Planning Liturgique', 20, 20);
   
   doc.setFontSize(12);
   doc.setTextColor(100);

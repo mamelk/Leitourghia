@@ -1,6 +1,6 @@
 {
-  "name": "Paroisse Lecteurs",
-  "description": "Application mobile de gestion des lecteurs de paroisse : planification assistée, suivi des formations, présences multi-paroisses et interface apaisante.",
+  "name": "Leitourghia",
+  "description": "Service Paroissial - Application de gestion des lecteurs : planification, formation, présences et analytics.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

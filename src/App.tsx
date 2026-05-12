@@ -101,6 +101,45 @@ const ParishContext = createContext<{
 
 // --- Components ---
 
+const Logo = ({ className = "w-8 h-8", showText = true }: { className?: string, showText?: boolean }) => {
+  return (
+    <div className="flex items-center gap-3">
+      <div className={`relative ${className}`}>
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
+          {/* Shield Base */}
+          <path d="M50 5C50 5 15 15 15 45C15 75 50 95 50 95C50 95 85 75 85 45C85 15 50 5 50 5Z" fill="#0B1120" stroke="#f59e0b" strokeWidth="2"/>
+          
+          {/* Internal Shield detail */}
+          <path d="M50 12C50 12 22 20 22 45C22 70 50 88 50 88C50 88 78 70 78 45C78 20 50 12 50 12Z" fill="url(#logo-grad)" fillOpacity="0.2"/>
+          
+          {/* Cross */}
+          <path d="M50 25V75M35 45H65" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round"/>
+          
+          {/* Flame effects / Curves */}
+          <path d="M50 15C40 30 35 50 50 85" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+          <path d="M50 15C60 30 65 50 50 85" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+          
+          {/* Glow */}
+          <circle cx="50" cy="45" r="15" fill="#f59e0b" fillOpacity="0.1" />
+
+          <defs>
+            <linearGradient id="logo-grad" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#f59e0b" />
+              <stop offset="1" stopColor="#3b82f6" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      {showText && (
+        <div className="flex flex-col">
+          <h1 className="text-white font-black text-xl italic tracking-tighter uppercase leading-none">Leitourghia</h1>
+          <p className="text-[10px] text-accent font-bold uppercase tracking-widest mt-1">Service Paroissial</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }: any) => {
   const variants: any = {
     primary: 'bg-primary text-white hover:bg-slate-800 border border-slate-700 shadow-lg',
@@ -613,7 +652,7 @@ const DashboardView = ({ readers, upcomingMasses, upcomingMeetings, attendanceRe
                     (p.assignments || []).filter(a => a.readerId === reader.id).map(a => ({ ...a, massId: p.massId }))
                   );
                   const readerFeedbacks = feedbacks.filter(f => f.readerId === reader.id);
-                  generateReaderStatsPDF(reader, readerAttendance, readerAssignments, masses, readerFeedbacks, currentParish?.name ||"Leitourghia");
+                  generateReaderStatsPDF(reader, readerAttendance, readerAssignments, masses, readerFeedbacks, currentParish?.name || "Leitourghia");
                 }}
                 variant="secondary" 
                 className="w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
@@ -2113,14 +2152,105 @@ const MassesView = ({ masses, parishId, onRefresh }: { masses: Mass[], parishId:
 
 // --- Main App ---
 
+const EstechView = () => {
+  return (
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header className="text-center space-y-4">
+        <div className="w-24 h-24 bg-accent rounded-[32px] flex items-center justify-center mx-auto shadow-2xl shadow-amber-500/20 mb-6">
+           <Settings size={48} className="text-midnight" />
+        </div>
+        <h1 className="text-5xl font-black text-white italic uppercase tracking-tighter">ESTECH</h1>
+        <p className="text-accent font-bold uppercase tracking-[0.3em] text-sm">Innovation & Excellence Technologique</p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <Card className="bg-slate-900/50 border-slate-800 p-8 space-y-6">
+          <h2 className="text-2xl font-bold text-white italic uppercase tracking-tight">Le Profil du Fondateur</h2>
+          <div className="space-y-4">
+            <div className="flex items-start gap-4">
+               <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent shrink-0">
+                  <UserCircle size={24} />
+               </div>
+               <div>
+                  <h3 className="font-bold text-white text-lg italic">Étienne MANAMA</h3>
+                  <p className="text-slate-500 text-sm">Ingénieur en Informatique & Visionnaire</p>
+               </div>
+            </div>
+            
+            <p className="text-slate-400 leading-relaxed text-sm md:text-base">
+              Ingénieur passionné par le développement de solutions numériques innovantes, Étienne Manama allie expertise technique et engagement communautaire pour transformer la gestion des activités paroissiales.
+            </p>
+
+            <div className="grid grid-cols-1 gap-3 pt-4">
+               <div className="flex items-center gap-3 bg-background/50 p-4 rounded-2xl border border-slate-800">
+                  <CheckCircle className="text-green-500" size={18} />
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">Formateur des Lecteurs</span>
+               </div>
+               <div className="flex items-center gap-3 bg-background/50 p-4 rounded-2xl border border-slate-800">
+                  <CheckCircle className="text-green-500" size={18} />
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">Vice-Président du Lectorat Saint Gabriel</span>
+               </div>
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-6">
+           <Card className="bg-[#0B1120] border-slate-800 group hover:border-accent/40 transition-all p-8">
+              <h3 className="text-accent font-black uppercase tracking-widest text-xs mb-4">Notre Vision</h3>
+              <p className="text-slate-300 italic text-lg md:text-xl leading-relaxed">
+                "Mettre la technologie au service de la foi pour une organisation ecclésiale moderne, transparente et efficace."
+              </p>
+           </Card>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-slate-900/50 border-slate-800 p-6 flex flex-col items-center text-center space-y-2">
+                 <LayoutDashboard className="text-slate-500" size={24} />
+                 <h4 className="text-white font-bold text-xs uppercase tracking-widest">Expertise IT</h4>
+              </Card>
+              <Card className="bg-slate-900/50 border-slate-800 p-6 flex flex-col items-center text-center space-y-2">
+                 <CheckSquare className="text-slate-500" size={24} />
+                 <h4 className="text-white font-bold text-xs uppercase tracking-widest">Formation</h4>
+              </Card>
+           </div>
+        </div>
+      </div>
+
+      <section className="pt-12 border-t border-slate-900">
+         <div className="text-center space-y-4 mb-12">
+            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Nos Valeurs Fondamentales</h3>
+            <div className="w-12 h-1 bg-accent mx-auto rounded-full" />
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { title: 'Innovation', desc: 'Repousser les limites technologiques pour créer des outils sur mesure adaptés aux réalités locales.' },
+              { title: 'Service', desc: 'Accompagner les communautés chrétiennes dans leur transition vers une gestion numérique.' },
+              { title: 'Excellence', desc: 'Garantir la fiabilité, la sécurité et la simplicité de chaque solution développée.' }
+            ].map((v, i) => (
+              <Card key={i} className="text-center p-8 space-y-3 group hover:bg-accent/5 transition-all border-slate-800/40">
+                <h4 className="text-accent font-black uppercase italic tracking-widest">{v.title}</h4>
+                <p className="text-slate-500 text-sm leading-relaxed">{v.desc}</p>
+              </Card>
+            ))}
+         </div>
+      </section>
+
+      <footer className="text-center py-12">
+         <p className="text-slate-600 text-xs font-medium italic">Leitourghia est une solution propulsée par ESTECH · Étienne Manama</p>
+      </footer>
+    </div>
+  );
+};
+
 const LandingView = ({ 
   parishes, 
   onAdminClick, 
-  onSelectParish 
+  onSelectParish,
+  onEstechClick
 }: { 
   parishes: Parish[], 
   onAdminClick: () => void, 
-  onSelectParish: (p: Parish) => void
+  onSelectParish: (p: Parish) => void,
+  onEstechClick: () => void
 }) => {
   const [search, setSearch] = useState('');
   const [upcomingMasses, setUpcomingMasses] = useState<Mass[]>([]);
@@ -2164,18 +2294,8 @@ const LandingView = ({
         <div className="max-w-6xl mx-auto relative z-10">
           <nav className="flex justify-between items-center mb-24">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-accent rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-                <Church className="text-midnight" size={24} />
-              </div>
-              <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter">Leitourghia</h1>
+              <Logo className="w-12 h-12" />
             </div>
-            <Button 
-              onClick={onAdminClick}
-              variant="ghost" 
-              className="text-xs font-bold uppercase tracking-widest border border-slate-800 rounded-xl px-6 py-3 hover:bg-white hover:text-midnight transition-all"
-            >
-              Compte Admin
-            </Button>
           </nav>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -2298,7 +2418,7 @@ const LandingView = ({
       </section>
 
       <footer className="border-t border-slate-900 py-12 px-6 flex flex-col items-center gap-4">
-        <p className="text-slate-800 font-black tracking-[0.2em] uppercase">Estech</p>
+        <button onClick={onEstechClick} className="text-slate-800 font-black tracking-[0.2em] uppercase hover:text-accent transition-colors">Estech</button>
         <p className="text-slate-700 text-[10px] font-mono tracking-[0.4em] uppercase">Developed by Estech · © 2026</p>
       </footer>
     </div>
@@ -2435,7 +2555,7 @@ const PublicReaderAssignment = ({ role, reader, mass, parish, feedbacks = [] }: 
   );
 };
 
-const PublicParishConsultation = ({ parish, onBack, onAdminRequest }: { parish: Parish, onBack: () => void, onAdminRequest: (p: Parish) => void }) => {
+const PublicParishConsultation = ({ parish, onBack, onAdminRequest, onEstechClick }: { parish: Parish, onBack: () => void, onAdminRequest: (p: Parish) => void, onEstechClick: () => void }) => {
   const [masses, setMasses] = useState<Mass[]>([]);
   const [plannings, setPlannings] = useState<Record<string, Planning>>({});
   const [readers, setReaders] = useState<Reader[]>([]);
@@ -2507,7 +2627,7 @@ const PublicParishConsultation = ({ parish, onBack, onAdminRequest }: { parish: 
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
-            <Church className="w-12 h-12 text-accent animate-pulse" />
+            <Logo className="w-16 h-16" showText={false} />
             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Chargement du planning...</p>
           </div>
         ) : (
@@ -2553,6 +2673,12 @@ const PublicParishConsultation = ({ parish, onBack, onAdminRequest }: { parish: 
           </div>
         )}
       </div>
+      <div className="max-w-4xl mx-auto px-6 pb-12">
+        <footer className="border-t border-slate-900 py-12 flex flex-col items-center gap-4">
+          <button onClick={onEstechClick} className="text-slate-800 font-black tracking-[0.2em] uppercase hover:text-accent transition-colors">Estech</button>
+          <p className="text-slate-700 text-[10px] font-mono tracking-[0.4em] uppercase">Developed by Estech · © 2026</p>
+        </footer>
+      </div>
     </div>
   );
 };
@@ -2564,15 +2690,15 @@ const AuthView = ({ onLogin, onRegisterParish }: { onLogin: () => void, onRegist
        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-blue-500/5 blur-[150px] rounded-full pointer-events-none" />
 
        <div className="max-w-md w-full space-y-12 relative z-10 text-center">
-          <div className="space-y-6">
-            <div className="w-24 h-24 bg-accent rounded-[32px] flex items-center justify-center mx-auto shadow-2xl shadow-amber-500/20">
-              <Church className="text-midnight" size={48} />
+            <div className="space-y-6">
+              <div className="w-24 h-24 bg-accent rounded-[32px] flex items-center justify-center mx-auto shadow-2xl shadow-amber-500/20">
+                <Logo className="w-16 h-16" showText={false} />
+              </div>
+              <div>
+                <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter">Espace Admin</h2>
+                <p className="text-slate-500 font-medium mt-2">Gérez les plannings et les lecteurs de votre paroisse.</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter">Espace Admin</h2>
-              <p className="text-slate-500 font-medium mt-2">Gérez les plannings et les lecteurs de votre paroisse.</p>
-            </div>
-          </div>
 
           <div className="space-y-4">
             <Button onClick={onLogin} variant="accent" className="w-full py-6 text-lg rounded-3xl">
@@ -2687,7 +2813,7 @@ const SuperAdminView = ({ parishes, onDeleteParish }: { parishes: Parish[], onDe
 };
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'auth' | 'admin'>('landing');
+  const [view, setView] = useState<'landing' | 'auth' | 'admin' | 'estech'>('landing');
   const [user, setUser] = useState<User | null>(null);
   const [parishes, setParishes] = useState<Parish[]>([]);
   const [currentParish, setCurrentParish] = useState<Parish | null>(null);
@@ -2994,12 +3120,37 @@ export default function App() {
             setView('admin');
           }
         }}
+        onEstechClick={() => setView('estech')}
       />
       </>
     );
   }
 
-  // 2. Page d'accueil (Landing)
+  // 2. Page Estech
+  if (view === 'estech') {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <div className="bg-background min-h-screen relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[50%] h-[50%] bg-accent/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <nav className="max-w-6xl mx-auto p-8 flex justify-between items-center relative z-10">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('landing')}>
+              <Logo className="w-10 h-10" />
+            </div>
+            <button onClick={() => setView('landing')} className="text-slate-500 hover:text-white font-bold uppercase tracking-widest text-[10px] flex items-center gap-2 transition-colors">
+              <ArrowLeft size={16} />
+              Quitter
+            </button>
+          </nav>
+          <div className="max-w-6xl mx-auto px-6 py-12 relative z-10">
+            <EstechView />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 3. Page d'accueil (Landing)
   if (view === 'landing') {
     return (
       <>
@@ -3008,6 +3159,7 @@ export default function App() {
         parishes={parishes} 
         onAdminClick={() => setView('auth')} 
         onSelectParish={(p) => setSelectedPublicParish(p)} 
+        onEstechClick={() => setView('estech')}
       />
       </>
     );
@@ -3046,7 +3198,7 @@ export default function App() {
            className="bg-card p-10 rounded-[48px] shadow-2xl border border-slate-800 space-y-8 max-w-md w-full relative z-10 overflow-y-auto max-h-[90vh]"
          >
           <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-center mx-auto text-accent shrink-0">
-            <Church size={40} />
+            <Logo className="w-12 h-12" showText={false} />
           </div>
           <div className="space-y-2">
             <h2 className="text-3xl font-black text-white leading-tight italic uppercase tracking-tighter">Configuration</h2>
@@ -3102,10 +3254,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto space-y-12">
           <header className="flex justify-between items-center">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('landing')}>
-              <div className="w-12 h-12 bg-accent rounded-2xl flex items-center justify-center">
-                <Church className="text-midnight" size={24} />
-              </div>
-              <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter">Leitourghia Admin</h1>
+              <Logo className="w-12 h-12" />
             </div>
           </header>
 
@@ -3240,15 +3389,7 @@ export default function App() {
         {/* Sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-primary border-r border-slate-800 flex flex-col transition-transform duration-300 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
           <div className="p-8 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-accent rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/10">
-                <Church className="text-midnight" size={24} />
-              </div>
-              <div>
-                <h1 className="text-white font-black text-xl italic tracking-tighter uppercase leading-none">Leitourghia</h1>
-                <p className="text-[10px] text-accent font-bold uppercase tracking-widest mt-1">Gestion Lecteurs</p>
-              </div>
-            </div>
+            <Logo className="w-12 h-12" />
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-500 hover:text-white">
                <X size={24} />
             </button>
@@ -3304,6 +3445,7 @@ export default function App() {
                   { id: 'readers', icon: Users, label: 'Lecteurs' },
                   { id: 'presences', icon: CheckSquare, label: 'Présences' },
                   { id: 'planning', icon: CalendarDays, label: 'Planning' },
+                  { id: 'estech', icon: LayoutDashboard, label: 'ESTECH' },
                   { id: 'feedbacks', icon: MessageSquare, label: 'Critiques' },
                   { id: 'stats', icon: BarChart3, label: 'Stats' },
                   { id: 'settings', icon: Settings, label: 'Paramètres' },
@@ -3415,6 +3557,9 @@ export default function App() {
               )}
               {activeTab === 'planning' && currentParish && (
                 <PlanningView masses={activeMasses} readers={activeReaders} meetings={activeMeetings} parishId={currentParish.id} />
+              )}
+              {activeTab === 'estech' && (
+                <EstechView />
               )}
               {activeTab === 'meetings' && currentParish && (
                 <MeetingView parishId={currentParish.id} />
