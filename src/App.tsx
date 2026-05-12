@@ -2169,6 +2169,13 @@ const LandingView = ({
               </div>
               <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter">Paroissia</h1>
             </div>
+            <Button 
+              onClick={onAdminClick}
+              variant="ghost" 
+              className="text-xs font-bold uppercase tracking-widest border border-slate-800 rounded-xl px-6 py-3 hover:bg-white hover:text-midnight transition-all"
+            >
+              Compte Admin
+            </Button>
           </nav>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -2185,6 +2192,15 @@ const LandingView = ({
                 <p className="text-xl text-slate-400 font-medium max-w-lg leading-relaxed">
                   Consultez les plannings des lecteurs et les horaires des messes de votre paroisse en temps réel.
                 </p>
+                <div className="flex gap-4 pt-4">
+                  <Button 
+                    onClick={onAdminClick}
+                    variant="secondary"
+                    className="rounded-2xl px-8 py-6 text-sm font-bold uppercase tracking-widest"
+                  >
+                    Créer ma paroisse
+                  </Button>
+                </div>
               </motion.div>
 
               <div className="relative group max-w-md">
