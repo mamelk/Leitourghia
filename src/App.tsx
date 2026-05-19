@@ -45,7 +45,8 @@ import {
   Quote,
   Phone,
   MapPin,
-  FileDown
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
@@ -58,6 +59,8 @@ import {
   signInWithPopup, 
   GoogleAuthProvider,
   signOut,
+  updatePassword,
+  sendPasswordResetEmail,
   User
 } from 'firebase/auth';
 import { 
@@ -141,7 +144,7 @@ const Logo = ({ className = "w-8 h-8", showText = true }: { className?: string, 
   );
 };
 
-const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }: any) => {
+const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, ...props }: any) => {
   const variants: any = {
     primary: 'bg-primary text-white hover:bg-slate-800 border border-slate-700 shadow-lg',
     secondary: 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700',
@@ -153,6 +156,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
       disabled={disabled}
       onClick={onClick}
       className={`px-4 py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${variants[variant]} ${className}`}
+      {...props}
     >
       {children}
     </button>
@@ -2684,7 +2688,7 @@ const PublicParishConsultation = ({ parish, onBack, onAdminRequest, onEstechClic
   );
 };
 
-const AuthView = ({ onLogin, onRegisterParish, onBack }: { onLogin: () => void, onRegisterParish: () => void, onBack: () => void }) => {
+const AuthView = ({ onLogin, onRegisterParish, onBack, onResetPassword }: { onLogin: () => void, onRegisterParish: () => void, onBack: () => void, onResetPassword: () => void }) => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 relative overflow-hidden">
        <button onClick={onBack} className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 font-bold uppercase tracking-widest text-[10px] transition-colors z-20">
@@ -2712,6 +2716,12 @@ const AuthView = ({ onLogin, onRegisterParish, onBack }: { onLogin: () => void, 
               <Button onClick={onLogin} variant="accent" className="w-full py-5 text-sm rounded-2xl font-bold">
                  Accès Admin Google
               </Button>
+              <button 
+                onClick={onResetPassword}
+                className="text-[10px] font-bold text-slate-600 uppercase tracking-widest hover:text-accent transition-colors pt-2 block mx-auto"
+              >
+                Mot de passe compte oublié ?
+              </button>
             </div>
 
             <div className="relative">
@@ -2839,6 +2849,7 @@ export default function App() {
   const [currentParish, setCurrentParish] = useState<Parish | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [isCreatingParish, setIsCreatingParish] = useState(false);
   const [activeReaders, setActiveReaders] = useState<Reader[]>([]);
   const [activeMasses, setActiveMasses] = useState<Mass[]>([]);
@@ -2849,31 +2860,57 @@ export default function App() {
   const [isDeletingParish, setIsDeletingParish] = useState<string | null>(null);
   const [isWipingAll, setIsWipingAll] = useState(false);
   const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
+  const pendingRequestsCount = passwordRequests.length;
   const [passwordUpdateValue, setPasswordUpdateValue] = useState('');
-
-  useEffect(() => {
-    if (currentParish) {
-      const q = query(collection(db, 'password_requests'), where('parishId', '==', currentParish.id), orderBy('createdAt', 'desc'));
-      const unsub = onSnapshot(q, (snapshot) => {
-        const reqs: any[] = [];
-        snapshot.forEach(d => reqs.push({ ...d.data(), id: d.id }));
-        setPasswordRequests(reqs);
-      });
-      return unsub;
-    }
-  }, [currentParish?.id]);
+  const [parishNameUpdate, setParishNameUpdate] = useState('');
+  const [parishCityUpdate, setParishCityUpdate] = useState('');
+  const [parishDioceseUpdate, setParishDioceseUpdate] = useState('');
+  const [parishDeaneryUpdate, setParishDeaneryUpdate] = useState('');
+  const [newAccountPassword, setNewAccountPassword] = useState('');
+  const [hasNotifiedRequests, setHasNotifiedRequests] = useState(false);
+  const isGoogleUserAccount = useMemo(() => {
+    if (!user) return false;
+    return user.providerId === 'google.com' || user.providerData.some(p => p.providerId === 'google.com');
+  }, [user]);
 
   const updateParishPassword = async () => {
     if (!currentParish || !passwordUpdateValue) return;
+    setActionLoading(true);
     try {
       await updateDoc(doc(db, 'parishes', currentParish.id), {
         password: passwordUpdateValue
       });
-      toast.success("Mot de passe mis à jour !");
+      toast.success("Mot de passe paroissial mis à jour !");
       setPasswordUpdateValue('');
-    } catch (e) {
+    } catch (e: any) {
       console.error("Update error:", e);
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(e.message || "Erreur lors de la mise à jour");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const updateParishInfo = async () => {
+    if (!currentParish || (!parishNameUpdate && !parishCityUpdate && !parishDioceseUpdate && !parishDeaneryUpdate)) return;
+    setActionLoading(true);
+    try {
+      const updates: any = {};
+      if (parishNameUpdate) updates.name = parishNameUpdate;
+      if (parishCityUpdate) updates.city = parishCityUpdate;
+      if (parishDioceseUpdate) updates.diocese = parishDioceseUpdate;
+      if (parishDeaneryUpdate) updates.deanery = parishDeaneryUpdate;
+      
+      await updateDoc(doc(db, 'parishes', currentParish.id), updates);
+      toast.success("Profil de la paroisse mis à jour !");
+      setParishNameUpdate('');
+      setParishCityUpdate('');
+      setParishDioceseUpdate('');
+      setParishDeaneryUpdate('');
+    } catch (e: any) {
+      console.error("Update error:", e);
+      toast.error(e.message || "Erreur lors de la mise à jour");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -2885,6 +2922,69 @@ export default function App() {
       console.error("Delete error:", e);
     }
   };
+
+  const updateAccountPassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    if (!user || !newAccountPassword) return;
+    
+    // Check if user is using Google/Social login
+    if (isGoogleUserAccount) {
+      toast.error("Votre compte est lié à Google. Vous devez changer votre mot de passe depuis les paramètres de votre compte Google.");
+      return;
+    }
+
+    if (newAccountPassword.length < 6) {
+      toast.error("Le mot de passe doit faire au moins 6 caractères");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await updatePassword(user, newAccountPassword);
+      toast.success("Mot de passe de votre compte mis à jour avec succès !");
+      setNewAccountPassword('');
+    } catch (e: any) {
+      console.error("Auth update error:", e);
+      if (e.code === 'auth/requires-recent-login') {
+        toast.error("Sécurité : Cette action nécessite une connexion toute récente. Déconnectez-vous puis reconnectez-vous pour continuer.");
+      } else if (e.code === 'auth/user-mismatch') {
+        toast.error("Erreur de session. Veuillez vous reconnecter.");
+      } else {
+        toast.error(e.message || "Erreur lors de la mise à jour");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setParishLoggedIn(false);
+      setCurrentParish(null);
+      setView('landing');
+      toast.success('Déconnexion réussie');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Erreur lors de la déconnexion');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const email = window.prompt("Veuillez entrer votre adresse e-mail pour réinitialiser votre mot de passe :");
+    if (!email) return;
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("E-mail de réinitialisation envoyé !");
+    } catch (e: any) {
+      console.error("Reset error:", e);
+      toast.error(e.message || "Erreur lors de l'envoi");
+    }
+  };
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [superAdminParishView, setSuperAdminParishView] = useState(false);
   const [isParishPasswordLock, setIsParishPasswordLock] = useState<Parish | null>(null);
@@ -2916,6 +3016,46 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (pendingRequestsCount > 0 && currentParish && parishLoggedIn && !hasNotifiedRequests) {
+      toast.info(`Vous avez ${pendingRequestsCount} demande(s) de mot de passe en attente dans "Paramètres"`, {
+        duration: 10000,
+        action: {
+          label: 'Voir',
+          onClick: () => setActiveTab('settings')
+        }
+      });
+      setHasNotifiedRequests(true);
+    }
+    if (pendingRequestsCount === 0) setHasNotifiedRequests(false);
+  }, [pendingRequestsCount, parishLoggedIn, currentParish?.id]);
+
+  useEffect(() => {
+    let q;
+    if (isSuperAdmin && !currentParish) {
+      q = query(collection(db, 'password_requests'));
+    } else if (currentParish && user) {
+      // Query by parishId - security rules handle restricting to admins of that parish
+      q = query(collection(db, 'password_requests'), where('parishId', '==', currentParish.id));
+    } else {
+      return;
+    }
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const reqs: any[] = [];
+      snapshot.forEach(d => {
+        const data = d.data();
+        reqs.push({ ...data, id: d.id });
+      });
+      // Sort in memory instead
+      reqs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setPasswordRequests(reqs);
+    }, (error) => {
+      console.error("Password requests fetching error:", error);
+    });
+    return unsub;
+  }, [currentParish?.id, isSuperAdmin]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, u => {
@@ -3161,23 +3301,27 @@ export default function App() {
   const ParishPasswordModal = ({ parish }: { parish: Parish }) => {
     const handleRequestReset = async () => {
       if (!requestContact) {
-        toast.error("Veuillez saisir un moyen de contact");
+        toast.error("Veuillez saisir un moyen de contact (Email ou Téléphone)");
         return;
       }
+      setLoading(true);
       try {
         await addDoc(collection(db, 'password_requests'), {
           parishId: parish.id,
           parishName: parish.name,
+          adminId: parish.adminId, // Add adminId to simplify security rules
           contact: requestContact,
           status: 'pending',
           createdAt: serverTimestamp()
         });
-        toast.success("Demande envoyée ! L'administrateur sera informé.");
+        toast.success("Demande enregistrée ! L'administrateur de la paroisse vous contactera.");
         setIsForgotParishPassword(false);
         setRequestContact('');
       } catch (e) {
         console.error("Request error:", e);
-        toast.error("Erreur lors de l'envoi de la demande");
+        toast.error("Erreur réseau. Veuillez réessayer.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -3249,11 +3393,31 @@ export default function App() {
                 >
                   Gérer la Paroisse
                 </Button>
-                <div className="flex flex-col gap-2">
-                  <p className="text-[10px] text-slate-600 font-medium italic">Seul l'administrateur de cette paroisse possède ce code.</p>
+
+                {user && user.uid === parish.adminId && (
+                  <Button 
+                    variant="secondary" 
+                    className="w-full py-4 rounded-2xl font-bold uppercase text-[10px] tracking-widest border border-slate-800"
+                    onClick={() => {
+                      setCurrentParish(parish);
+                      setParishLoggedIn(true);
+                      setView('admin');
+                      setIsParishPasswordLock(null);
+                      setSelectedPublicParish(null);
+                      toast.success("Accès autorisé via votre compte administrateur.");
+                    }}
+                  >
+                    Déverrouiller avec mon compte
+                  </Button>
+                )}
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <p className="text-[10px] text-slate-600 font-medium italic leading-relaxed">
+                    Besoin du code ? Demandez-le à votre bureau paroissial.
+                  </p>
                   <button 
                     onClick={() => setIsForgotParishPassword(true)}
-                    className="text-accent text-[10px] font-bold uppercase tracking-widest hover:underline"
+                    className="text-accent text-[11px] font-bold uppercase tracking-widest hover:underline"
                   >
                     Mot de passe oublié ?
                   </button>
@@ -3267,35 +3431,38 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter leading-none">Récupération</h2>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Demander à l'administrateur</p>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Signaler à l'administrateur</p>
               </div>
               <div className="space-y-6 text-left">
-                <p className="text-slate-400 text-xs leading-relaxed text-center">
-                  Si vous avez oublié le mot de passe, laissez votre contact (Email ou Phone) ci-dessous. L'administrateur recevra votre demande.
-                </p>
+                <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+                  <p className="text-slate-400 text-[10px] leading-relaxed text-center font-medium italic">
+                    Note: L'envoi automatique de mail n'est pas activé. Votre demande sera affichée sur le tableau de bord de l'administrateur système.
+                  </p>
+                </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] ml-1">Votre Contact</label>
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] ml-1">Votre Contact (Email ou Tél)</label>
                   <input 
                     type="text" 
                     autoFocus
                     value={requestContact}
                     onChange={(e) => setRequestContact(e.target.value)} 
-                    placeholder="Email ou Numéro de téléphone..." 
+                    placeholder="ex: +243 81... ou email@mail.com" 
                     className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-all text-sm font-medium" 
                   />
                 </div>
                 <Button 
                    className="w-full py-4 rounded-2xl font-black uppercase tracking-widest" 
                    variant="accent" 
+                   disabled={loading}
                    onClick={handleRequestReset}
                 >
-                  Envoyer la demande
+                  {loading ? 'Envoi...' : 'Envoyer la demande'}
                 </Button>
                 <button 
                   onClick={() => setIsForgotParishPassword(false)}
-                  className="w-full text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-colors"
+                  className="w-full text-slate-400 hover:text-white text-xs transition-colors"
                 >
-                  Retour à la connexion
+                  Annuler
                 </button>
               </div>
             </>
@@ -3306,49 +3473,40 @@ export default function App() {
   };
 
   // --- RENDER ---
-  if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-background">
-      <Toaster position="top-center" richColors />
-      <Logo className="w-16 h-16 animate-pulse" showText={false} />
-    </div>
-  );
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-background">
+          <Logo className="w-16 h-16 animate-pulse" showText={false} />
+        </div>
+      );
+    }
 
-  // Security guard for admin view
-  if (view === 'admin' && !user && !parishLoggedIn) {
-     setView('landing');
-     return null;
-  }
+    if (selectedPublicParish) {
+      return (
+        <>
+          {isParishPasswordLock && <ParishPasswordModal parish={isParishPasswordLock} />}
+          <PublicParishConsultation 
+            parish={selectedPublicParish} 
+            onBack={() => setSelectedPublicParish(null)} 
+            onAdminRequest={(p) => {
+              if (isSuperAdmin) {
+                setCurrentParish(p);
+                setParishLoggedIn(true);
+                setView('admin');
+                setSelectedPublicParish(null);
+              } else {
+                setIsParishPasswordLock(p);
+              }
+            }}
+            onEstechClick={() => setView('estech')}
+          />
+        </>
+      );
+    }
 
-  // 1. Consultation Publique d'une paroisse spécifique
-  if (selectedPublicParish) {
-    return (
-      <>
-        <Toaster position="top-center" richColors />
-        {isParishPasswordLock && <ParishPasswordModal parish={isParishPasswordLock} />}
-        <PublicParishConsultation 
-          parish={selectedPublicParish} 
-          onBack={() => setSelectedPublicParish(null)} 
-          onAdminRequest={(p) => {
-            if (isSuperAdmin) {
-              setCurrentParish(p);
-              setParishLoggedIn(true);
-              setView('admin');
-              setSelectedPublicParish(null);
-            } else {
-              setIsParishPasswordLock(p);
-            }
-          }}
-          onEstechClick={() => setView('estech')}
-        />
-      </>
-    );
-  }
-
-  // 2. Page Estech
-  if (view === 'estech') {
-    return (
-      <>
-        <Toaster position="top-center" richColors />
+    if (view === 'estech') {
+      return (
         <div className="bg-background min-h-screen relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[50%] h-[50%] bg-accent/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <nav className="max-w-6xl mx-auto p-8 flex justify-between items-center relative z-10">
@@ -3364,246 +3522,238 @@ export default function App() {
             <EstechView />
           </div>
         </div>
-      </>
-    );
-  }
+      );
+    }
 
-  // 3. Page d'accueil (Landing)
-  if (view === 'landing') {
-    return (
-      <>
-        <Toaster position="top-center" richColors />
+    if (view === 'landing') {
+      return (
         <LandingView 
-        parishes={parishes} 
-        onAdminClick={() => setView('auth')} 
-        onSelectParish={(p) => setSelectedPublicParish(p)} 
-        onEstechClick={() => setView('estech')}
-      />
-      </>
-    );
-  }
+          parishes={parishes} 
+          onAdminClick={() => setView('auth')} 
+          onSelectParish={(p) => setSelectedPublicParish(p)} 
+          onEstechClick={() => setView('estech')}
+        />
+      );
+    }
 
-  // 3. Authentification / Inscription
-  if (view === 'auth' && !user) {
-    return (
-      <>
-        <Toaster position="top-center" richColors />
+    if (view === 'auth' && !user) {
+      return (
         <AuthView 
-        onLogin={login} 
-        onRegisterParish={() => {
-          login(); // Need to be logged in to register a parish
-          setIsCreatingParish(true);
-        }} 
-        onBack={() => setView('landing')}
-      />
-      </>
-    );
-  }
+          onLogin={login} 
+          onRegisterParish={() => {
+            login();
+            setIsCreatingParish(true);
+          }} 
+          onBack={() => setView('landing')}
+          onResetPassword={handleResetPassword}
+        />
+      );
+    }
 
-  if (isCreatingParish && user) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center p-8 bg-background text-center relative overflow-hidden">
-        <Toaster position="top-center" richColors />
-        <div className="absolute top-[20%] left-[-10%] w-[40%] h-[40%] bg-accent/5 blur-[100px] rounded-full" />
-        <motion.div 
-           initial={{ opacity: 0, scale: 0.9 }}
-           animate={{ opacity: 1, scale: 1 }}
-           className="bg-card p-10 rounded-[48px] shadow-2xl border border-slate-800 space-y-8 max-w-md w-full relative z-10 overflow-y-auto max-h-[90vh]"
-         >
-          <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-center mx-auto text-accent shrink-0">
-            <Logo className="w-12 h-12" showText={false} />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-black text-white leading-tight italic uppercase tracking-tighter">Configuration</h2>
-            <p className="text-slate-500 text-sm leading-relaxed px-4">Remplissez les informations de votre paroisse pour commencer.</p>
-          </div>
-          <div className="space-y-4 text-left">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nom de la Paroisse *</label>
-              <input type="text" value={newParishName} onChange={(e) => setNewParishName(e.target.value.replace(/[0-9]/g, ''))} placeholder="ex: Notre-Dame" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
+    if (isCreatingParish && user) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center p-8 bg-background text-center relative overflow-hidden">
+          <div className="absolute top-[20%] left-[-10%] w-[40%] h-[40%] bg-accent/5 blur-[100px] rounded-full" />
+          <motion.div 
+             initial={{ opacity: 0, scale: 0.9 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-card p-10 rounded-[48px] shadow-2xl border border-slate-800 space-y-8 max-w-md w-full relative z-10 overflow-y-auto max-h-[90vh]"
+           >
+            <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-center mx-auto text-accent shrink-0">
+              <Logo className="w-12 h-12" showText={false} />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe d'administration *</label>
-              <input type="password" value={newParishPassword} onChange={(e) => setNewParishPassword(e.target.value)} placeholder="••••••••" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
+            <div className="space-y-2">
+              <h2 className="text-3xl font-black text-white leading-tight italic uppercase tracking-tighter">Configuration</h2>
+              <p className="text-slate-500 text-sm leading-relaxed px-4">Remplissez les informations de votre paroisse pour commencer.</p>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Adresse</label>
-              <input type="text" value={newParishAddress} onChange={(e) => setNewParishAddress(e.target.value)} placeholder="12 rue de l'Eglise..." className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 text-left">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Doyenné</label>
-                <input type="text" value={newParishDeanery} onChange={(e) => setNewParishDeanery(e.target.value.replace(/[0-9]/g, ''))} className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors text-sm" />
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nom de la Paroisse *</label>
+                <input type="text" value={newParishName} onChange={(e) => setNewParishName(e.target.value.replace(/[0-9]/g, ''))} placeholder="ex: Notre-Dame" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Diocèse</label>
-                <input type="text" value={newParishDiocese} onChange={(e) => setNewParishDiocese(e.target.value.replace(/[0-9]/g, ''))} className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors text-sm" />
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe d'administration *</label>
+                <input type="password" value={newParishPassword} onChange={(e) => setNewParishPassword(e.target.value)} placeholder="••••••••" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
               </div>
-            </div>
-            <Button onClick={async () => { await createParish(); setView('admin'); }} variant="accent" className="w-full py-4 rounded-2xl" disabled={!newParishName || !newParishPassword}>
-              Créer la paroisse
-            </Button>
-            <Button variant="secondary" onClick={() => setIsCreatingParish(false)} className="w-full py-4 rounded-2xl">Annuler</Button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // 5. Sélection de Paroisse (Admin)
-  if (user && !currentParish && (!isSuperAdmin || superAdminParishView)) {
-    const myParishes = parishes.filter(p => canManage(p) && (
-      !searchQuery || 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.diocese && p.diocese.toLowerCase().includes(searchQuery.toLowerCase()))
-    ));
-    const otherParishes = parishes.filter(p => !canManage(p) && searchQuery && (
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.diocese && p.diocese.toLowerCase().includes(searchQuery.toLowerCase()))
-    ));
-
-    return (
-      <div className="min-h-screen bg-background p-8 md:p-12 animate-in fade-in duration-700">
-        <div className="max-w-5xl mx-auto space-y-12">
-          <header className="flex justify-between items-center">
-            <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('landing')}>
-              <Logo className="w-12 h-12" />
-            </div>
-          </header>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-1 space-y-8">
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white tracking-tight leading-none italic uppercase">Bienvenue</h2>
-                <p className="text-slate-500 text-sm">Gérez vos paroisses ou rejoignez-en une via son mot de passe administrateur.</p>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Adresse</label>
+                <input type="text" value={newParishAddress} onChange={(e) => setNewParishAddress(e.target.value)} placeholder="12 rue de l'Eglise..." className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors" />
               </div>
-
-              <Card className="p-8 space-y-6 bg-accent/5 border-accent/20">
-                <div className="w-14 h-14 bg-accent/10 rounded-[20px] flex items-center justify-center text-accent">
-                  <Plus size={32} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Doyenné</label>
+                  <input type="text" value={newParishDeanery} onChange={(e) => setNewParishDeanery(e.target.value.replace(/[0-9]/g, ''))} className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors text-sm" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white uppercase italic">Nouvelle Paroisse</h3>
-                  <p className="text-slate-500 text-xs mt-1">Créez un nouvel espace pour votre communauté.</p>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Diocèse</label>
+                  <input type="text" value={newParishDiocese} onChange={(e) => setNewParishDiocese(e.target.value.replace(/[0-9]/g, ''))} className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-colors text-sm" />
                 </div>
-                <Button variant="accent" onClick={() => setIsCreatingParish(true)} className="w-full py-4 rounded-xl font-bold">
-                  ENREGISTRER
-                </Button>
-              </Card>
+              </div>
+              <Button onClick={async () => { await createParish(); setView('admin'); }} variant="accent" className="w-full py-4 rounded-2xl" disabled={!newParishName || !newParishPassword}>
+                Créer la paroisse
+              </Button>
+              <Button variant="secondary" onClick={() => setIsCreatingParish(false)} className="w-full py-4 rounded-2xl">Annuler</Button>
             </div>
+          </motion.div>
+        </div>
+      );
+    }
 
-            <div className="lg:col-span-2 space-y-12">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">Mes Paroisses Accréditées</h3>
+    if (user && !currentParish && (!isSuperAdmin || superAdminParishView)) {
+      const myParishes = parishes.filter(p => canManage(p) && (
+        !searchQuery || 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.diocese && p.diocese.toLowerCase().includes(searchQuery.toLowerCase()))
+      ));
+      const otherParishes = parishes.filter(p => !canManage(p) && searchQuery && (
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.diocese && p.diocese.toLowerCase().includes(searchQuery.toLowerCase()))
+      ));
+
+      return (
+        <div className="min-h-screen bg-background p-8 md:p-12 animate-in fade-in duration-700">
+          <div className="max-w-5xl mx-auto space-y-12">
+            <header className="flex justify-between items-center">
+              <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('landing')}>
+                <Logo className="w-12 h-12" />
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="lg:col-span-1 space-y-8">
+                <div className="space-y-4">
+                  <h2 className="text-4xl font-black text-white tracking-tight leading-none italic uppercase">Bienvenue</h2>
+                  <p className="text-slate-500 text-sm">Gérez vos paroisses ou rejoignez-en une via son mot de passe administrateur.</p>
                 </div>
-                {myParishes.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {myParishes.map(p => (
-                      <Card 
-                        key={p.id} 
-                        onClick={() => { setCurrentParish(p); setActiveTab('dashboard'); setView('admin'); }}
-                        className="p-6 cursor-pointer border-slate-800 hover:border-accent/40 group transition-all"
-                      >
-                        <div className="flex justify-between items-center">
-                           <div className="space-y-1">
-                             <h4 className="font-bold text-white group-hover:text-accent transition-colors">{p.name}</h4>
-                             <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{p.diocese || 'Local'}</p>
-                           </div>
-                           <ChevronRight size={18} className="text-slate-700 group-hover:text-accent group-hover:translate-x-1 transition-all" />
-                        </div>
-                      </Card>
-                    ))}
+
+                <Card className="p-8 space-y-6 bg-accent/5 border-accent/20">
+                  <div className="w-14 h-14 bg-accent/10 rounded-[20px] flex items-center justify-center text-accent">
+                    <Plus size={32} />
                   </div>
-                ) : (
-                  <Card className="p-12 border-dashed border-slate-800 bg-transparent flex flex-col items-center justify-center text-center space-y-4">
-                    <Church size={48} className="text-slate-800" />
-                    <div className="space-y-1">
-                      <p className="text-slate-500 font-medium">Vous ne gérez aucune paroisse pour le moment.</p>
-                      <p className="text-slate-700 text-xs italic">Créez votre première paroisse pour commencer.</p>
+                  <div>
+                    <h3 className="text-xl font-bold text-white uppercase italic">Nouvelle Paroisse</h3>
+                    <p className="text-slate-500 text-xs mt-1">Créez un nouvel espace pour votre communauté.</p>
+                  </div>
+                  <Button variant="accent" onClick={() => setIsCreatingParish(true)} className="w-full py-4 rounded-xl font-bold">
+                    ENREGISTRER
+                  </Button>
+                </Card>
+              </div>
+
+              <div className="lg:col-span-2 space-y-12">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">Mes Paroisses Accréditées</h3>
+                  </div>
+                  {myParishes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {myParishes.map(p => (
+                        <Card 
+                          key={p.id} 
+                          onClick={() => { setCurrentParish(p); setActiveTab('dashboard'); setView('admin'); }}
+                          className="p-6 cursor-pointer border-slate-800 hover:border-accent/40 group transition-all"
+                        >
+                          <div className="flex justify-between items-center">
+                             <div className="space-y-1">
+                               <h4 className="font-bold text-white group-hover:text-accent transition-colors">{p.name}</h4>
+                               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{p.diocese || 'Local'}</p>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <button 
+                                 onClick={(e) => { 
+                                   e.stopPropagation(); 
+                                   setCurrentParish(p); 
+                                   setActiveTab('settings'); 
+                                   setView('admin'); 
+                                 }}
+                                 className="p-2 hover:bg-white/10 rounded-lg text-slate-500 hover:text-accent transition-colors"
+                               >
+                                 <Settings size={16} />
+                               </button>
+                               <ChevronRight size={18} className="text-slate-700 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                             </div>
+                          </div>
+                        </Card>
+                      ))}
                     </div>
-                  </Card>
-                )}
-              </div>
-
-              <div className="space-y-6 border-t border-slate-900 pt-12">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">Rechercher une paroisse globale</h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
-                    <input 
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Chercher par nom..."
-                      className="bg-slate-900 border border-slate-800 rounded-full py-2 pl-9 pr-4 text-xs text-white outline-none focus:border-accent w-48"
-                    />
-                  </div>
+                  ) : (
+                    <Card className="p-12 border-dashed border-slate-800 bg-transparent flex flex-col items-center justify-center text-center space-y-4">
+                      <Church size={48} className="text-slate-800" />
+                      <div className="space-y-1">
+                        <p className="text-slate-500 font-medium">Vous ne gérez aucune paroisse pour le moment.</p>
+                        <p className="text-slate-700 text-xs italic">Créez votre première paroisse pour commencer.</p>
+                      </div>
+                    </Card>
+                  )}
                 </div>
 
-                {searchQuery && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-300">
-                    {otherParishes.map(p => (
-                      <Card 
-                        key={p.id} 
-                        onClick={() => { setCurrentParish(p); setActiveTab('dashboard'); setView('admin'); }}
-                        className="p-6 cursor-pointer border-slate-800/40 hover:border-slate-600 group transition-all"
-                      >
-                        <div className="flex justify-between items-center">
-                           <div className="space-y-1">
-                             <h4 className="font-bold text-slate-300 group-hover:text-white transition-colors">{p.name}</h4>
-                             <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">{p.diocese || 'Secteur'}</p>
-                           </div>
-                           <div className="flex items-center gap-2 text-[8px] font-black text-slate-700 uppercase tracking-widest group-hover:text-accent transition-colors">
-                             S'authentifier
-                             <Lock size={10} />
-                           </div>
-                        </div>
-                      </Card>
-                    ))}
-                    {otherParishes.length === 0 && (
-                      <p className="text-slate-700 italic text-sm py-4 col-span-full text-center">Aucun résultat trouvé dans l'annuaire global.</p>
-                    )}
+                <div className="space-y-6 border-t border-slate-900 pt-12">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em]">Rechercher une paroisse globale</h3>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                      <input 
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Chercher par nom..."
+                        className="bg-slate-900 border border-slate-800 rounded-full py-2 pl-9 pr-4 text-xs text-white outline-none focus:border-accent w-48"
+                      />
+                    </div>
                   </div>
-                )}
+
+                  {searchQuery && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-300">
+                      {otherParishes.map(p => (
+                        <Card 
+                          key={p.id} 
+                          onClick={() => { setCurrentParish(p); setActiveTab('dashboard'); setView('admin'); }}
+                          className="p-6 cursor-pointer border-slate-800/40 hover:border-slate-600 group transition-all"
+                        >
+                          <div className="flex justify-between items-center">
+                             <div className="space-y-1">
+                               <h4 className="font-bold text-slate-300 group-hover:text-white transition-colors">{p.name}</h4>
+                               <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">{p.diocese || 'Secteur'}</p>
+                             </div>
+                             <div className="flex items-center gap-2 text-[8px] font-black text-slate-700 uppercase tracking-widest group-hover:text-accent transition-colors">
+                               S'authentifier
+                               <Lock size={10} />
+                             </div>
+                          </div>
+                        </Card>
+                      ))}
+                      {otherParishes.length === 0 && (
+                        <p className="text-slate-700 italic text-sm py-4 col-span-full text-center">Aucun résultat trouvé dans l'annuaire global.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // 6. Login Paroisse spécifique (Mot de passe secondaire)
-  if (currentParish && !parishLoggedIn && !isSuperAdmin) {
-     return (
-       <div className="h-screen flex items-center justify-center bg-background p-8">
-          <Toaster position="top-center" richColors />
-          <Card className="max-w-sm w-full space-y-8 p-10 text-center border-2 border-slate-800 shadow-2xl">
-            <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mx-auto text-accent"><Church size={40} /></div>
-            <div>
-               <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">{currentParish.name}</h2>
-               <p className="text-slate-500 text-sm mt-2 font-medium">Mot de passe de la paroisse requis.</p>
-            </div>
-            <div className="space-y-4">
-              <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="Mot de passe" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white text-center outline-none focus:border-accent transition-colors" />
-              <Button className="w-full py-4 rounded-2xl" variant="accent" onClick={handleLogin}>Confirmer</Button>
-              <button onClick={() => setCurrentParish(null)} className="text-slate-500 text-xs font-bold uppercase">Retour</button>
-            </div>
-          </Card>
-       </div>
-     );
-  }
+    if (currentParish && !parishLoggedIn && !isSuperAdmin) {
+       return (
+         <div className="h-screen flex items-center justify-center bg-background p-8">
+            <Card className="max-w-sm w-full space-y-8 p-10 text-center border-2 border-slate-800 shadow-2xl">
+              <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mx-auto text-accent"><Church size={40} /></div>
+              <div>
+                 <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">{currentParish.name}</h2>
+                 <p className="text-slate-500 text-sm mt-2 font-medium">Mot de passe de la paroisse requis.</p>
+              </div>
+              <div className="space-y-4">
+                <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="Mot de passe" className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white text-center outline-none focus:border-accent transition-colors" />
+                <Button className="w-full py-4 rounded-2xl" variant="accent" onClick={handleLogin}>Confirmer</Button>
+                <button onClick={() => setCurrentParish(null)} className="text-slate-500 text-xs font-bold uppercase">Retour</button>
+              </div>
+            </Card>
+         </div>
+       );
+    }
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setParishLoggedIn(false);
-    setCurrentParish(null);
-    setView('landing');
-  };
-
-  return (
-    <ParishContext.Provider value={{ currentParish, setCurrentParish, parishes }}>
-      <Toaster position="top-center" richColors />
+    return (
       <div className="min-h-screen bg-background flex flex-col md:flex-row">
         
         {/* Sidebar */}
@@ -3622,323 +3772,458 @@ export default function App() {
                   onClick={() => {
                     setCurrentParish(null);
                     setSuperAdminParishView(false);
-                    setActiveTab('superadmin');
-                    setIsMobileMenuOpen(false);
+                    setView('landing');
                   }}
-                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all group ${
-                    activeTab === 'superadmin' && !superAdminParishView
-                      ? 'bg-accent/10 text-accent border border-accent/20' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${!currentParish && !superAdminParishView ? 'bg-accent/10 text-accent font-bold' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
                 >
-                  <Settings size={22} className={activeTab === 'superadmin' && !superAdminParishView ? 'text-accent' : 'text-slate-500 group-hover:text-slate-300'} />
-                  <span className="font-bold text-sm">Collectivité</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setCurrentParish(null);
-                    setSuperAdminParishView(true);
-                    setActiveTab('superadmin');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all group ${
-                    superAdminParishView && !currentParish
-                      ? 'bg-accent/10 text-accent border border-accent/20' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Search size={22} className={superAdminParishView && !currentParish ? 'text-accent' : 'text-slate-500 group-hover:text-slate-300'} />
-                  <span className="font-bold text-sm">Paroisses</span>
+                  <BarChart3 size={20} />
+                  Dashboard Global
                 </button>
               </>
             )}
-            
-            {currentParish && (
-              <>
-                <div className="pt-4 pb-2 px-6">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Paroisse</p>
-                </div>
+
+            <div className="py-4">
+              <p className="px-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">Gestion</p>
+              <nav className="space-y-1">
                 {[
-                  { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau' },
-                  { id: 'masses', icon: Church, label: 'Messes' },
-                  { id: 'meetings', icon: CalendarRange, label: 'Réunions' },
-                  { id: 'readers', icon: Users, label: 'Lecteurs' },
-                  { id: 'presences', icon: CheckSquare, label: 'Présences' },
-                  { id: 'planning', icon: CalendarDays, label: 'Planning' },
-                  { id: 'estech', icon: LayoutDashboard, label: 'ESTECH' },
-                  { id: 'feedbacks', icon: MessageSquare, label: 'Critiques' },
-                  { id: 'stats', icon: BarChart3, label: 'Stats' },
-                  { id: 'settings', icon: Settings, label: 'Paramètres' },
-                ].map((tab) => (
+                  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+                  { id: 'readers', label: 'Lecteurs', icon: Users },
+                  { id: 'masses', label: 'Messes', icon: Church },
+                  { id: 'planning', label: 'Plannings', icon: CalendarDays },
+                  { id: 'attendance', label: 'Présences', icon: CheckSquare },
+                  { id: 'meetings', label: 'Réunions', icon: CalendarRange },
+                  { id: 'feedback', label: 'Retours', icon: MessageSquare },
+                  { id: 'reports', label: 'Rapports', icon: FileDown },
+                  { id: 'settings', label: 'Paramètres', icon: Settings }
+                ].map((item) => (
                   <button
-                    key={tab.id}
+                    key={item.id}
                     onClick={() => {
-                      setActiveTab(tab.id);
+                      setActiveTab(item.id);
+                      if (currentParish && (isSuperAdmin || canManage(currentParish))) {
+                        setParishLoggedIn(true);
+                      }
                       setIsMobileMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl transition-all group ${
-                      activeTab === tab.id 
-                        ? 'bg-accent/10 text-accent border border-accent/20' 
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                    }`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-accent text-midnight font-bold shadow-lg shadow-accent/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
                   >
-                    <tab.icon size={20} className={activeTab === tab.id ? 'text-accent' : 'text-slate-500 group-hover:text-slate-300'} />
-                    <span className="font-bold text-sm tracking-tight">{tab.label}</span>
+                    <item.icon size={20} />
+                    {item.label}
                   </button>
                 ))}
-              </>
-            )}
+              </nav>
+            </div>
           </nav>
 
-          <div className="p-6 mt-auto space-y-2">
-            {currentParish && (
-              <button 
-                onClick={() => {
-                  setCurrentParish(null);
-                  setParishLoggedIn(false);
-                  setActiveTab(isSuperAdmin ? 'superadmin' : 'dashboard');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-3 text-accent hover:text-white font-bold text-[10px] uppercase py-3 transition-colors bg-slate-900 rounded-xl border border-slate-800"
-              >
-                Changer de Paroisse
-              </button>
-            )}
-
-            <button 
+          <div className="p-4 border-t border-slate-800">
+             <button 
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-3 text-slate-500 hover:text-red-400 font-bold text-sm py-3 transition-colors"
-            >
-              <UserCircle size={20} />
-              Déconnexion
-            </button>
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all font-bold"
+             >
+               <LogIn size={20} className="rotate-180" />
+               Déconnexion
+             </button>
           </div>
         </aside>
 
-        {/* Mobile Backdrop */}
-        {isMobileMenuOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
-        )}
-
-        {/* Mobile Top Navbar */}
-        <div className="md:hidden bg-secondary px-6 py-4 flex justify-between items-center fixed top-0 w-full z-30 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white bg-slate-900 rounded-xl border border-slate-800">
-               <Menu size={20} />
-             </button>
-             <div className="flex flex-col">
-               <h1 className="text-white font-black text-sm uppercase italic tracking-tighter leading-none">Leitourghia</h1>
-               {currentParish && (
-                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{currentParish.name}</p>
-               )}
+        {/* Main Content */}
+        <main className="flex-1 md:ml-72 min-h-screen relative">
+          <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+             <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="md:hidden text-slate-400 hover:text-white"
+                >
+                  <Menu size={24} />
+                </button>
+                <div>
+                   <h2 className="text-white font-bold text-lg tracking-tight italic uppercase">
+                     {activeTab === 'dashboard' ? 'Tableau de bord' : 
+                      activeTab === 'readers' ? 'Lecteurs' : 
+                      activeTab === 'masses' ? 'Messes' : 
+                      activeTab === 'planning' ? 'Plannings' : 
+                      activeTab === 'attendance' ? 'Présences' : 
+                      activeTab === 'meetings' ? 'Réunions' :
+                      activeTab === 'feedback' ? 'Retours' :
+                      activeTab === 'reports' ? 'Rapports' :
+                      'Paramètres'}
+                   </h2>
+                   <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">
+                     {currentParish?.name || 'Vue Globale'}
+                   </p>
+                </div>
              </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleLogout} className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800">
-              <UserCircle size={24} />
-            </button>
-          </div>
-        </div>
 
-        {/* Main Content Area */}
-        <main className="flex-1 md:ml-72 min-h-screen px-4 pt-24 pb-12 md:pt-12 md:pb-12 md:px-12 max-w-6xl">
+             <div className="flex items-center gap-3">
+                {isSuperAdmin && pendingRequestsCount > 0 && (
+                   <button 
+                    onClick={() => { setActiveTab('settings'); setSuperAdminParishView(false); }}
+                    className="relative p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all"
+                   >
+                     <Bell size={20} fill="currentColor" />
+                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-background">
+                       {pendingRequestsCount}
+                     </span>
+                   </button>
+                )}
+                <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-2xl py-1.5 pl-1.5 pr-3">
+                   <div className="w-8 h-8 bg-accent/20 rounded-xl flex items-center justify-center text-accent">
+                      <UserCircle size={20} />
+                   </div>
+                   <div className="text-left hidden sm:block">
+                      <p className="text-[10px] text-white font-bold leading-none">{user?.displayName || (user?.email ? user.email.split('@')[0] : 'Admin')}</p>
+                      <p className="text-[8px] text-slate-500 uppercase font-bold tracking-tighter mt-0.5">{isSuperAdmin ? 'Super Admin' : 'Paroisse'}</p>
+                   </div>
+                </div>
+             </div>
+          </header>
+
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab}
+              key={activeTab + (currentParish?.id || 'global')}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              className="p-6 md:p-10"
             >
-              {activeTab === 'superadmin' && isSuperAdmin && (
-                <SuperAdminView 
-                  parishes={parishes} 
-                  onDeleteParish={deleteParish} 
-                  onEnterParish={(p) => {
-                    setCurrentParish(p);
-                    setParishLoggedIn(true);
-                    setSuperAdminParishView(true);
-                    setActiveTab('dashboard');
-                  }}
-                />
-              )}
-              {activeTab === 'dashboard' && currentParish && (
-                <DashboardView readers={activeReaders} upcomingMasses={activeMasses.slice(0, 5)} upcomingMeetings={activeMeetings.slice(0, 5)} attendanceRecords={activeAttendance} onNavigate={setActiveTab} />
-              )}
-              {activeTab === 'masses' && currentParish && (
-                <MassesView masses={activeMasses} parishId={currentParish.id} onRefresh={() => {}} />
-              )}
-              {activeTab === 'readers' && currentParish && (
-                <ReadersView 
-                  readers={activeReaders} 
-                  parishId={currentParish.id} 
-                  onRefresh={() => {}} 
-                  attendance={activeAttendance}
-                  plannings={activePlannings}
-                  masses={activeMasses}
-                  feedbacks={activeFeedbacks}
-                />
-              )}
-              {activeTab === 'presences' && currentParish && (
-                <PresenceView masses={activeMasses} readers={activeReaders} parishId={currentParish.id} />
-              )}
-              {activeTab === 'planning' && currentParish && (
-                <PlanningView masses={activeMasses} readers={activeReaders} meetings={activeMeetings} parishId={currentParish.id} />
-              )}
-              {activeTab === 'estech' && (
-                <EstechView />
-              )}
-              {activeTab === 'meetings' && currentParish && (
-                <MeetingView parishId={currentParish.id} />
-              )}
-              {activeTab === 'feedbacks' && currentParish && (
-                <FeedbackView readers={activeReaders} masses={activeMasses} parishId={currentParish.id} />
-              )}
-              {activeTab === 'stats' && currentParish && (
-                <ReaderStatsView readers={activeReaders} masses={activeMasses} parishId={currentParish.id} />
-              )}
-              {!currentParish && activeTab !== 'superadmin' && (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-                   <Church size={48} className="mb-4 opacity-20" />
-                   <p>Veuillez sélectionner une paroisse.</p>
-                </div>
-              )}
-              {activeTab === 'settings' && currentParish && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col gap-2">
-                <h2 className="text-3xl font-black text-white tracking-tight italic uppercase">Paramètres</h2>
-                <p className="text-slate-500 font-medium tracking-tight">Gérez la sécurité et les informations de votre paroisse.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {!currentParish && isSuperAdmin && !superAdminParishView ? <SuperAdminView parishes={parishes} onDeleteParish={deleteParish} onEnterParish={(p) => { setCurrentParish(p); setParishLoggedIn(true); setSuperAdminParishView(true); setActiveTab('dashboard'); }} /> : (
                 <div className="space-y-8">
-                  {/* Password Management */}
-                  <Card className="flex flex-col gap-6 p-8 border-slate-800/40 bg-slate-900/30">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                        <Lock size={24} />
+                  {activeTab === 'dashboard' && currentParish && (
+                    <DashboardView readers={activeReaders} upcomingMasses={activeMasses.slice(0, 5)} upcomingMeetings={activeMeetings.slice(0, 5)} attendanceRecords={activeAttendance} onNavigate={setActiveTab} />
+                  )}
+                  {activeTab === 'masses' && currentParish && (
+                    <MassesView masses={activeMasses} parishId={currentParish.id} onRefresh={() => {}} />
+                  )}
+                  {activeTab === 'readers' && currentParish && (
+                    <ReadersView 
+                      readers={activeReaders} 
+                      parishId={currentParish.id} 
+                      onRefresh={() => {}} 
+                      attendance={activeAttendance}
+                      plannings={activePlannings}
+                      masses={activeMasses}
+                      feedbacks={activeFeedbacks}
+                    />
+                  )}
+                  {activeTab === 'attendance' && currentParish && (
+                    <PresenceView masses={activeMasses} readers={activeReaders} parishId={currentParish.id} />
+                  )}
+                  {activeTab === 'planning' && currentParish && (
+                    <PlanningView masses={activeMasses} readers={activeReaders} meetings={activeMeetings} parishId={currentParish.id} />
+                  )}
+                  {activeTab === 'meetings' && currentParish && (
+                    <MeetingView parishId={currentParish.id} />
+                  )}
+                  {activeTab === 'feedback' && currentParish && (
+                    <FeedbackView readers={activeReaders} masses={activeMasses} parishId={currentParish.id} />
+                  )}
+                  {activeTab === 'stats' && currentParish && (
+                    <ReaderStatsView readers={activeReaders} masses={activeMasses} parishId={currentParish.id} />
+                  )}
+                  {activeTab === 'settings' && currentParish && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex flex-col gap-2">
+                        <h2 className="text-3xl font-black text-white tracking-tight italic uppercase">Paramètres</h2>
+                        <p className="text-slate-500 font-medium tracking-tight">Gérez la sécurité et les informations de votre paroisse.</p>
                       </div>
-                      <div>
-                        <h3 className="text-white font-bold text-lg italic">Sécurité Paroissiale</h3>
-                        <p className="text-slate-500 text-xs">Modifiez le mot de passe d'accès.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                       <div className="p-4 bg-background/50 rounded-2xl border border-slate-800 space-y-1">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mot de passe actuel</p>
-                          <p className="text-white font-mono text-lg tracking-wider">{currentParish.password}</p>
-                       </div>
 
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Nouveau mot de passe</label>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text"
-                              value={passwordUpdateValue}
-                              onChange={(e) => setPasswordUpdateValue(e.target.value)}
-                              placeholder="Nouveau code..."
-                              className="flex-1 bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
-                            />
-                            <Button variant="accent" onClick={updateParishPassword} className="aspect-square p-0 w-12 flex justify-center items-center rounded-xl">
-                              <CheckCircle size={20} />
-                            </Button>
-                          </div>
-                       </div>
-                    </div>
-                  </Card>
-
-                  {/* Password Requests */}
-                  <Card className="flex flex-col gap-4 p-8 border-slate-800/40 bg-slate-900/30">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
-                        <Bell size={24} />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-bold text-lg italic">Demandes de code</h3>
-                        <p className="text-slate-500 text-xs text-wrap">Personnes ayant oublié le mot de passe.</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 mt-2">
-                      {passwordRequests.length === 0 ? (
-                        <div className="bg-slate-900/50 p-6 rounded-2xl text-center border-dashed border border-slate-800">
-                          <p className="text-xs text-slate-600 font-bold uppercase tracking-widest leading-loose">Aucune demande en attente</p>
-                        </div>
-                      ) : (
-                        passwordRequests.map(req => (
-                          <div key={req.id} className="flex items-center justify-between p-4 bg-background/50 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-right-4">
-                            <div className="space-y-1">
-                              <p className="text-white font-bold text-sm tracking-tight">{req.contact}</p>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-widest">
-                                {req.createdAt ? format(req.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'À l\'instant'}
-                              </p>
-                            </div>
-                            <button onClick={() => deletePasswordRequest(req.id)} className="p-2 text-slate-600 hover:text-red-500 transition-colors">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </Card>
-                </div>
-
-                <div className="space-y-8">
-                  <Card className="flex flex-col gap-4 p-8 border-slate-800/40 opacity-80">
-                    <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                      <Church size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-bold text-lg">Nouvelle Paroisse</h3>
-                      <p className="text-slate-500 text-sm mt-1">Gérez une autre communauté avec le même compte.</p>
-                    </div>
-                    <Button variant="secondary" onClick={() => setIsCreatingParish(true)} className="mt-2 py-4 rounded-xl">
-                      <Plus size={18} />
-                      Ajouter une paroisse
-                    </Button>
-                  </Card>
-
-                  <Card className="flex flex-col gap-4 p-8 border-red-500/20 bg-red-500/5">
-                    <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500">
-                      <Trash2 size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-bold text-lg text-red-400">Zone de Danger</h3>
-                      <p className="text-slate-500 text-sm mt-1">Actions irréversibles sur votre paroisse.</p>
-                    </div>
-                    <div className="flex flex-col gap-3 mt-2">
-                       {currentParish && (currentParish.adminId === user?.uid || user?.email === 'mamelkmanama@gmail.com') ? (
-                        <div>
-                          {isDeletingParish === currentParish.id ? (
-                            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl space-y-3">
-                              <p className="text-xs text-red-400 font-bold leading-tight">Voulez-vous vraiment supprimer "{currentParish.name}" ?</p>
-                              <div className="flex gap-2">
-                                <Button variant="accent" className="flex-1 py-2 text-xs bg-red-500 hover:bg-red-600 border-none" onClick={() => deleteParish(currentParish.id)}>Confirmer</Button>
-                                <Button variant="secondary" className="flex-1 py-2 text-xs" onClick={() => setIsDeletingParish(null)}>Annuler</Button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-8">
+                          {/* Parish Information Management */}
+                          <Card className="flex flex-col gap-6 p-8 border-slate-800/40 bg-slate-900/30">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500">
+                                <Church size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-white font-bold text-lg italic">Profil Paroisse</h3>
+                                <p className="text-slate-500 text-xs">Identité de votre communauté.</p>
                               </div>
                             </div>
-                          ) : (
-                            <Button variant="ghost" onClick={() => setIsDeletingParish(currentParish.id)} className="text-red-400 border border-red-500/20 hover:bg-red-500/10 w-full justify-start py-4 rounded-xl">
-                              Supprimer la paroisse
-                            </Button>
-                          )}
+                            
+                            <div className="space-y-4">
+                               <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Nom de la Paroisse</label>
+                                  <input 
+                                    type="text"
+                                    value={parishNameUpdate || (currentParish?.name || '')}
+                                    onChange={(e) => setParishNameUpdate(e.target.value)}
+                                    placeholder="Nom..."
+                                    className="w-full bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                                  />
+                               </div>
+
+                               <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Ville / Localité</label>
+                                  <input 
+                                    type="text"
+                                    value={parishCityUpdate || (currentParish?.city || '')}
+                                    onChange={(e) => setParishCityUpdate(e.target.value)}
+                                    placeholder="Ville..."
+                                    className="w-full bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                                  />
+                               </div>
+
+                               <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Diocèse</label>
+                                    <input 
+                                      type="text"
+                                      value={parishDioceseUpdate || (currentParish?.diocese || '')}
+                                      onChange={(e) => setParishDioceseUpdate(e.target.value)}
+                                      placeholder="Ex: Paris..."
+                                      className="w-full bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                                    />
+                                 </div>
+                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Doyenné</label>
+                                    <input 
+                                      type="text"
+                                      value={parishDeaneryUpdate || (currentParish?.deanery || '')}
+                                      onChange={(e) => setParishDeaneryUpdate(e.target.value)}
+                                      placeholder="Ex: Centre..."
+                                      className="w-full bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                                    />
+                                 </div>
+                               </div>
+
+                               <Button 
+                                 onClick={updateParishInfo}
+                                 variant="accent" 
+                                 disabled={(!parishNameUpdate && !parishCityUpdate && !parishDioceseUpdate && !parishDeaneryUpdate) || actionLoading}
+                                 className="w-full py-4 rounded-xl font-black italic uppercase text-[10px] tracking-widest"
+                               >
+                                 {actionLoading ? <Loader2 size={18} className="animate-spin mr-2" /> : "Mettre à jour le profil"}
+                               </Button>
+                            </div>
+                          </Card>
+
+                          {/* Password Management */}
+                          <Card className="flex flex-col gap-6 p-8 border-slate-800/40 bg-slate-900/30">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
+                                <Lock size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-white font-bold text-lg italic">Code d'Accès Paroisse</h3>
+                                <p className="text-slate-500 text-xs">Le code requis pour gérer cette paroisse.</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                               <div className="p-4 bg-background/50 rounded-2xl border border-slate-800 space-y-1 relative group">
+                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Code Actuel</p>
+                                  <p className="text-white font-mono text-xl tracking-[0.2em] font-black">{currentParish.password}</p>
+                                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Lock size={14} className="text-slate-700" />
+                                  </div>
+                               </div>
+
+                               <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Nouveau code paroisse</label>
+                                  <form 
+                                    onSubmit={(e) => { e.preventDefault(); updateParishPassword(); }}
+                                    className="flex gap-2"
+                                  >
+                                    <input 
+                                      type="text"
+                                      value={passwordUpdateValue}
+                                      onChange={(e) => setPasswordUpdateValue(e.target.value)}
+                                      placeholder="Nouveau code d'accès..."
+                                      className="flex-1 bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                                    />
+                                    <Button 
+                                      type="submit"
+                                      variant="accent" 
+                                      disabled={!passwordUpdateValue || actionLoading}
+                                      className="aspect-square p-0 w-12 flex justify-center items-center rounded-xl disabled:opacity-50"
+                                    >
+                                      {actionLoading ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle size={20} />}
+                                    </Button>
+                                  </form>
+                                  <p className="text-[9px] text-slate-600 italic px-1 leading-relaxed">
+                                    Ce code est partagé avec toute personne devant administrer cette paroisse.
+                                  </p>
+                               </div>
+                            </div>
+                          </Card>
+
+                          {/* Password Requests */}
+                          <Card className="flex flex-col gap-4 p-8 border-slate-800/40 bg-slate-900/30">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
+                                <Bell size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-white font-bold text-lg italic">Demandes de code</h3>
+                                <p className="text-slate-500 text-xs text-wrap">Personnes ayant oublié le mot de passe.</p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3 mt-2">
+                              {passwordRequests.length === 0 ? (
+                                <div className="bg-slate-900/50 p-6 rounded-2xl text-center border-dashed border border-slate-800">
+                                  <p className="text-xs text-slate-600 font-bold uppercase tracking-widest leading-loose">Aucune demande en attente</p>
+                                </div>
+                              ) : (
+                                passwordRequests.map(req => (
+                                  <div key={req.id} className="flex items-center justify-between p-4 bg-background/50 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-right-4">
+                                    <div className="space-y-1">
+                                      <p className="text-white font-bold text-sm tracking-tight">{req.contact}</p>
+                                      <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+                                        {req.createdAt ? format(req.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'À l\'instant'}
+                                      </p>
+                                    </div>
+                                    <button onClick={() => deletePasswordRequest(req.id)} className="p-2 text-slate-600 hover:text-red-500 transition-colors">
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </Card>
                         </div>
-                      ) : (
-                        <p className="text-[10px] text-slate-600 bg-slate-900/50 p-4 rounded-xl italic leading-relaxed">
-                          Seul le créateur de cette paroisse peut la supprimer définitivement.
-                        </p>
-                      )}
+
+                        <div className="space-y-8">
+                          {/* Account Management */}
+                          <Card className="flex flex-col gap-6 p-8 border-slate-800/40 bg-slate-900/30">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500">
+                                <UserCircle size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-white font-bold text-lg italic">
+                                  {user ? 'Sécurité du Compte Personnel' : 'Identification Session'}
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                  <p className="text-slate-500 text-[10px] uppercase font-bold tracking-tight">
+                                    {user ? user.email : currentParish?.name}
+                                  </p>
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${user?.email === SUPER_ADMIN_EMAIL ? 'bg-accent/20 text-accent' : (parishLoggedIn ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-500')}`}>
+                                    {user?.email === SUPER_ADMIN_EMAIL ? 'Super-Admin' : (parishLoggedIn ? 'Espace Paroisse' : 'Utilisateur')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {user ? (
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                   <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Nouveau mot de passe personnel</label>
+                                   <form onSubmit={(e) => { e.preventDefault(); updateAccountPassword(); }} className="flex gap-2">
+                                     <input 
+                                       type="password"
+                                       value={newAccountPassword}
+                                       onChange={(e) => setNewAccountPassword(e.target.value)}
+                                       placeholder={isGoogleUserAccount ? "Indisponible via Google" : "6 caractères min..."}
+                                       disabled={actionLoading}
+                                       className="flex-1 bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                     />
+                                     <Button 
+                                       type="submit"
+                                       variant="accent"
+                                       disabled={!newAccountPassword || actionLoading}
+                                       className="aspect-square p-0 w-12 flex justify-center items-center rounded-xl disabled:opacity-30"
+                                     >
+                                       {actionLoading ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle size={20} />}
+                                     </Button>
+                                   </form>
+                                   {isGoogleUserAccount ? (
+                                     <div className="mt-2 p-3 bg-amber-500/5 rounded-xl border border-amber-500/10 space-y-2">
+                                       <p className="text-[10px] text-amber-500/80 font-medium italic leading-relaxed">
+                                         Votre compte est authentifié via <span className="font-bold">Google</span>.
+                                       </p>
+                                     </div>
+                                   ) : (
+                                     <p className="text-[9px] text-slate-600 italic px-1">
+                                       Ceci modifie votre accès personnel lié à l'e-mail.
+                                     </p>
+                                   )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-6 bg-blue-500/5 rounded-2xl border border-blue-500/10 space-y-3">
+                                <p className="text-xs text-blue-400 font-medium italic text-center">
+                                  Identifié via le code d'accès de la paroisse <span className="font-bold underline">{currentParish?.name}</span>.
+                                </p>
+                                <p className="text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold">
+                                  Aucun compte e-mail personnel lié
+                                </p>
+                              </div>
+                            )}
+                          </Card>
+
+                          <Card className="flex flex-col gap-4 p-8 border-slate-800/40 bg-slate-900/30">
+                            <div className="w-12 h-12 bg-slate-800/50 rounded-2xl flex items-center justify-center text-slate-400">
+                              <Plus size={24} />
+                            </div>
+                            <div>
+                              <h3 className="text-white font-bold text-lg italic">Multi-Paroisses</h3>
+                              <p className="text-slate-500 text-sm mt-1">Gérez une autre communauté avec le même compte.</p>
+                            </div>
+                            <Button variant="secondary" onClick={() => setIsCreatingParish(true)} className="mt-2 py-4 rounded-xl">
+                              <Plus size={18} />
+                              Ajouter une paroisse
+                            </Button>
+                          </Card>
+
+                          <Card className="flex flex-col gap-4 p-8 border-red-500/20 bg-red-500/5">
+                            <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500">
+                              <Trash2 size={24} />
+                            </div>
+                            <div>
+                              <h3 className="text-white font-bold text-lg text-red-400">Zone de Danger</h3>
+                              <p className="text-slate-500 text-sm mt-1">Actions irréversibles sur votre paroisse.</p>
+                            </div>
+                            <div className="flex flex-col gap-3 mt-2">
+                               {currentParish && (currentParish.adminId === user?.uid || user?.email === 'mamelkmanama@gmail.com') ? (
+                                <div>
+                                  {isDeletingParish === currentParish.id ? (
+                                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl space-y-3">
+                                      <p className="text-xs text-red-400 font-bold leading-tight">Voulez-vous vraiment supprimer "{currentParish.name}" ?</p>
+                                      <div className="flex gap-2">
+                                        <Button variant="accent" className="flex-1 py-2 text-xs bg-red-500 hover:bg-red-600 border-none" onClick={() => deleteParish(currentParish.id)}>Confirmer</Button>
+                                        <Button variant="secondary" className="flex-1 py-2 text-xs" onClick={() => setIsDeletingParish(null)}>Annuler</Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <Button variant="ghost" onClick={() => setIsDeletingParish(currentParish.id)} className="text-red-400 border border-red-500/20 hover:bg-red-500/10 w-full justify-start py-4 rounded-xl">
+                                      Supprimer la paroisse
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[10px] text-slate-600 bg-slate-900/50 p-4 rounded-xl italic leading-relaxed">
+                                  Seul le créateur de cette paroisse peut la supprimer définitivement.
+                                </p>
+                              )}
+                            </div>
+                          </Card>
+                        </div>
+                      </div>
                     </div>
-                  </Card>
+                  )}
                 </div>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
-    </ParishContext.Provider>
+    );
+  };
+
+  // Security guard for admin view
+  if (view === 'admin' && !user && !parishLoggedIn) {
+     setView('landing');
+     return null;
+  }
+
+  return (
+    <>
+      <Toaster position="top-center" richColors expand={true} />
+      <ParishContext.Provider value={{ currentParish, setCurrentParish, parishes }}>
+        {renderContent()}
+      </ParishContext.Provider>
+    </>
   );
 }

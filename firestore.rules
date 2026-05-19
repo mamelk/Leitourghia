@@ -99,8 +99,8 @@ service cloud.firestore {
     match /parishes/{parishId} {
       allow read: if true; 
       allow create: if isSignedIn() && isValidParish(incoming());
-      allow update: if isParishAdmin(parishId) && 
-                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'address', 'deanery', 'diocese', 'password']);
+      allow update: if (isAnyAdmin(parishId) || !isSignedIn()) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'city', 'deanery', 'diocese', 'password']);
       allow delete: if isAdmin();
     }
 
@@ -155,7 +155,8 @@ service cloud.firestore {
 
     match /password_requests/{requestId} {
       allow create: if true;
-      allow list, delete: if isSignedIn() && (isParishAdmin(resource.data.parishId) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.adminId == request.auth.uid || isParishAdmin(resource.data.parishId)));
+      allow get, delete: if isAdmin() || (isSignedIn() && (resource.data.adminId == request.auth.uid || isParishAdmin(resource.data.parishId)));
     }
 
     match /global_admins/{adminId} {
