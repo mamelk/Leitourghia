@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">leitourghia</string>
+    <string name="title_activity_main">leitourghia</string>
+    <string name="package_name">leitourghia.app</string>
+    <string name="custom_url_scheme">leitourghia.app</string>
+</resources>

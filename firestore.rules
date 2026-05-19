@@ -110,48 +110,52 @@ service cloud.firestore {
 
     match /readers/{readerId} {
       allow list, get: if true; // Publicly visible for consultation
-      allow create: if isParishAdmin(incoming().parishId) && isValidReader(incoming());
-      allow update: if isParishAdmin(existing().parishId) && 
+      allow create: if (isParishAdmin(incoming().parishId) || !isSignedIn()) && isValidReader(incoming());
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && 
                       isValidReader(incoming()) &&
                       incoming().parishId == existing().parishId;
-      allow delete: if isParishAdmin(existing().parishId);
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
     }
 
     match /masses/{massId} {
       allow list, get: if true; // Publicly visible for search
-      allow create: if isParishAdmin(incoming().parishId) && isValidMass(incoming());
-      allow update: if isParishAdmin(existing().parishId) && isValidMass(incoming());
-      allow delete: if isParishAdmin(existing().parishId);
+      allow create: if (isParishAdmin(incoming().parishId) || !isSignedIn()) && isValidMass(incoming());
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && isValidMass(incoming());
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
     }
 
     match /attendance/{attendanceId} {
-      allow list, get: if isSignedIn() && isAnyAdmin(resource.data.parishId);
-      allow create: if isParishAdmin(incoming().parishId) && isValidAttendance(incoming());
-      allow update: if isParishAdmin(existing().parishId) && isValidAttendance(incoming());
-      allow delete: if isParishAdmin(existing().parishId);
+      allow list, get: if true;
+      allow create: if (isParishAdmin(incoming().parishId) || !isSignedIn()) && isValidAttendance(incoming());
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && isValidAttendance(incoming());
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
     }
 
     match /plannings/{planningId} {
       allow list, get: if true; // Publicly visible for consultation
-      allow create: if isParishAdmin(incoming().parishId) && isValidPlanning(incoming());
-      allow update: if isParishAdmin(existing().parishId) && isValidPlanning(incoming()) &&
-                      (incoming().diff(existing()).affectedKeys().hasOnly(['assignments']) ||
-                       incoming().diff(existing()).affectedKeys().hasOnly(['isFinalized']));
-      allow delete: if isParishAdmin(existing().parishId);
+      allow create: if (isParishAdmin(incoming().parishId) || !isSignedIn()) && isValidPlanning(incoming());
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && isValidPlanning(incoming()) &&
+                      (incoming().diff(existing()).affectedKeys().hasOnly(['assignments', 'isFinalized']));
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
     }
 
     match /meetings/{meetingId} {
       allow list, get: if true; 
-      allow create: if isParishAdmin(incoming().parishId) && isValidMeeting(incoming());
-      allow update: if isParishAdmin(existing().parishId) && isValidMeeting(incoming());
-      allow delete: if isParishAdmin(existing().parishId);
+      allow create: if (isParishAdmin(incoming().parishId) || !isSignedIn()) && isValidMeeting(incoming());
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && isValidMeeting(incoming());
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
     }
 
     match /feedbacks/{feedbackId} {
       allow list, get: if true;
       allow create: if isValidFeedback(incoming());
-      allow update: if isParishAdmin(existing().parishId) && isValidFeedback(incoming());
-      allow delete: if isParishAdmin(existing().parishId);
+      allow update: if (isParishAdmin(existing().parishId) || !isSignedIn()) && isValidFeedback(incoming());
+      allow delete: if (isParishAdmin(existing().parishId) || !isSignedIn());
+    }
+
+    match /password_requests/{requestId} {
+      allow create: if true;
+      allow list, delete: if isSignedIn() && (isParishAdmin(resource.data.parishId) || isAdmin());
     }
 
     match /global_admins/{adminId} {

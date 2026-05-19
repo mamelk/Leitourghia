@@ -35,6 +35,7 @@ import {
   Trash2,
   Settings,
   Lock,
+  LogIn,
   BarChart3,
   TrendingUp,
   PieChart,
@@ -2683,9 +2684,13 @@ const PublicParishConsultation = ({ parish, onBack, onAdminRequest, onEstechClic
   );
 };
 
-const AuthView = ({ onLogin, onRegisterParish }: { onLogin: () => void, onRegisterParish: () => void }) => {
+const AuthView = ({ onLogin, onRegisterParish, onBack }: { onLogin: () => void, onRegisterParish: () => void, onBack: () => void }) => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 relative overflow-hidden">
+       <button onClick={onBack} className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 font-bold uppercase tracking-widest text-[10px] transition-colors z-20">
+         <ArrowLeft size={16} />
+         Retour à l'accueil
+       </button>
        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-accent/5 blur-[150px] rounded-full pointer-events-none" />
        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-blue-500/5 blur-[150px] rounded-full pointer-events-none" />
 
@@ -2696,24 +2701,30 @@ const AuthView = ({ onLogin, onRegisterParish }: { onLogin: () => void, onRegist
               </div>
               <div>
                 <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter">Espace Admin</h2>
-                <p className="text-slate-500 font-medium mt-2">Gérez les plannings et les lecteurs de votre paroisse.</p>
+                <p className="text-slate-500 font-medium mt-2">Pour gérer votre paroisse, veuillez la sélectionner dans l'annuaire et utiliser son code d'accès.</p>
               </div>
             </div>
 
-          <div className="space-y-4">
-            <Button onClick={onLogin} variant="accent" className="w-full py-6 text-lg rounded-3xl">
-               Se connecter avec Google
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
-              <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold"><span className="bg-background px-4 text-slate-600">Ou</span></div>
+          <div className="space-y-6">
+            <div className="p-8 border border-slate-800 rounded-[32px] bg-slate-900/40 space-y-4">
+              <h3 className="text-accent font-black uppercase tracking-[0.2em] text-[10px]">Administrateur Général</h3>
+              <p className="text-slate-500 text-xs px-2">Espace réservé à l'administration centrale via l'adresse mail autorisée.</p>
+              <Button onClick={onLogin} variant="accent" className="w-full py-5 text-sm rounded-2xl font-bold">
+                 Accès Admin Google
+              </Button>
             </div>
-            <Button onClick={onRegisterParish} variant="secondary" className="w-full py-5 rounded-3xl">
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800/50"></div></div>
+              <div className="relative flex justify-center text-[8px] uppercase tracking-widest font-black"><span className="bg-background px-4 text-slate-700">Actions Secondaires</span></div>
+            </div>
+
+            <Button onClick={onRegisterParish} variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest font-bold">
                Enregistrer une nouvelle paroisse
             </Button>
           </div>
 
-          <p className="text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">Développement & Copyright · Estech 2026</p>
+          <p className="text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em]">Propulsé par Estech · © 2026</p>
        </div>
     </div>
   );
@@ -2721,7 +2732,7 @@ const AuthView = ({ onLogin, onRegisterParish }: { onLogin: () => void, onRegist
 
 const SUPER_ADMIN_EMAIL = 'mamelkmanama@gmail.com';
 
-const SuperAdminView = ({ parishes, onDeleteParish }: { parishes: Parish[], onDeleteParish: (id: string) => void }) => {
+const SuperAdminView = ({ parishes, onDeleteParish, onEnterParish }: { parishes: Parish[], onDeleteParish: (id: string) => void, onEnterParish: (p: Parish) => void }) => {
   const [search, setSearch] = useState('');
 
   const filtered = parishes.filter(p => 
@@ -2788,12 +2799,21 @@ const SuperAdminView = ({ parishes, onDeleteParish }: { parishes: Parish[], onDe
                     <p className="text-slate-500 text-[11px]">{p.deanery || 'N/A'}</p>
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <button 
-                      onClick={() => onDeleteParish(p.id)}
-                      className="p-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-900 rounded-xl"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button 
+                        onClick={() => onEnterParish(p)}
+                        className="p-2 text-accent hover:text-white transition-colors bg-accent/10 rounded-xl border border-accent/20"
+                        title="Entrer dans la paroisse"
+                      >
+                        <LogIn size={16} />
+                      </button>
+                      <button 
+                        onClick={() => onDeleteParish(p.id)}
+                        className="p-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-900 rounded-xl"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2828,8 +2848,47 @@ export default function App() {
   const [activeFeedbacks, setActiveFeedbacks] = useState<Feedback[]>([]);
   const [isDeletingParish, setIsDeletingParish] = useState<string | null>(null);
   const [isWipingAll, setIsWipingAll] = useState(false);
+  const [passwordRequests, setPasswordRequests] = useState<any[]>([]);
+  const [passwordUpdateValue, setPasswordUpdateValue] = useState('');
+
+  useEffect(() => {
+    if (currentParish) {
+      const q = query(collection(db, 'password_requests'), where('parishId', '==', currentParish.id), orderBy('createdAt', 'desc'));
+      const unsub = onSnapshot(q, (snapshot) => {
+        const reqs: any[] = [];
+        snapshot.forEach(d => reqs.push({ ...d.data(), id: d.id }));
+        setPasswordRequests(reqs);
+      });
+      return unsub;
+    }
+  }, [currentParish?.id]);
+
+  const updateParishPassword = async () => {
+    if (!currentParish || !passwordUpdateValue) return;
+    try {
+      await updateDoc(doc(db, 'parishes', currentParish.id), {
+        password: passwordUpdateValue
+      });
+      toast.success("Mot de passe mis à jour !");
+      setPasswordUpdateValue('');
+    } catch (e) {
+      console.error("Update error:", e);
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
+
+  const deletePasswordRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'password_requests', id));
+      toast.success("Demande supprimée");
+    } catch (e) {
+      console.error("Delete error:", e);
+    }
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [superAdminParishView, setSuperAdminParishView] = useState(false);
+  const [isParishPasswordLock, setIsParishPasswordLock] = useState<Parish | null>(null);
+  const [typedPassword, setTypedPassword] = useState('');
 
   const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
 
@@ -2852,6 +2911,8 @@ export default function App() {
   const [newParishDiocese, setNewParishDiocese] = useState('');
 
   const [parishLoggedIn, setParishLoggedIn] = useState(false);
+  const [isForgotParishPassword, setIsForgotParishPassword] = useState(false);
+  const [requestContact, setRequestContact] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -2866,10 +2927,10 @@ export default function App() {
           setView('admin');
         }
       } else {
-        if (view === 'admin') setView('landing');
+        if (view === 'admin' && !parishLoggedIn) setView('landing');
       }
     });
-  }, [view]);
+  }, [view, parishLoggedIn]);
 
   useEffect(() => {
     // Public fetch of all parishes for landing search
@@ -2892,6 +2953,7 @@ export default function App() {
 
   const canManage = (p: Parish) => {
     if (isSuperAdmin) return true;
+    if (currentParish?.id === p.id && parishLoggedIn) return true;
     if (!user) return false;
     if (p.adminId === user.uid) return true;
     const unlockedJson = localStorage.getItem(`unlocked_parishes_${user.uid}`);
@@ -2900,6 +2962,7 @@ export default function App() {
   };
 
   const unlockParish = (parishId: string) => {
+    setParishLoggedIn(true);
     if (!user) return;
     const unlockedJson = localStorage.getItem(`unlocked_parishes_${user.uid}`);
     const unlockedIds = unlockedJson ? JSON.parse(unlockedJson) : [];
@@ -2907,7 +2970,6 @@ export default function App() {
       const newUnlocked = [...unlockedIds, parishId];
       localStorage.setItem(`unlocked_parishes_${user.uid}`, JSON.stringify(newUnlocked));
     }
-    setParishLoggedIn(true);
   };
 
   useEffect(() => {
@@ -2973,6 +3035,9 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      if (result.user.email !== SUPER_ADMIN_EMAIL) {
+        toast.info("Connexion réussie mais vous n'avez pas de droits d'administrateur général.");
+      }
     } catch (error: any) {
       console.error("Erreur détaillée lors de la connexion:", error);
       if (error.code === 'auth/popup-blocked') {
@@ -2989,8 +3054,6 @@ export default function App() {
     // Check if current user is the creator or has already unlocked this parish in this session
     if (user && (currentParish.adminId === user.uid || canManage(currentParish))) {
       setParishLoggedIn(true);
-    } else {
-      setParishLoggedIn(false);
     }
     setLoginPassword('');
   }, [currentParish?.id, user?.uid]);
@@ -3095,33 +3158,188 @@ export default function App() {
 
   const [selectedPublicParish, setSelectedPublicParish] = useState<Parish | null>(null);
 
+  const ParishPasswordModal = ({ parish }: { parish: Parish }) => {
+    const handleRequestReset = async () => {
+      if (!requestContact) {
+        toast.error("Veuillez saisir un moyen de contact");
+        return;
+      }
+      try {
+        await addDoc(collection(db, 'password_requests'), {
+          parishId: parish.id,
+          parishName: parish.name,
+          contact: requestContact,
+          status: 'pending',
+          createdAt: serverTimestamp()
+        });
+        toast.success("Demande envoyée ! L'administrateur sera informé.");
+        setIsForgotParishPassword(false);
+        setRequestContact('');
+      } catch (e) {
+        console.error("Request error:", e);
+        toast.error("Erreur lors de l'envoi de la demande");
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-md flex items-center justify-center p-6">
+        <Card className="max-w-md w-full space-y-8 p-10 text-center border-2 border-slate-800 shadow-2xl relative animate-in fade-in zoom-in duration-300">
+          <button 
+            onClick={() => {
+              setIsParishPasswordLock(null);
+              setIsForgotParishPassword(false);
+            }} 
+            className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+
+          {!isForgotParishPassword ? (
+            <>
+              <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mx-auto text-accent shadow-xl shadow-accent/20">
+                <Lock size={40} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none">{parish.name}</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Accès Administrateur Paroissial</p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] ml-1">Mot de passe Paroisse</label>
+                  <input 
+                    type="password" 
+                    autoFocus
+                    value={typedPassword} 
+                    onChange={(e) => setTypedPassword(e.target.value)} 
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (parish.password === typedPassword) {
+                          setCurrentParish(parish);
+                          setParishLoggedIn(true);
+                          setView('admin');
+                          setIsParishPasswordLock(null);
+                          setSelectedPublicParish(null);
+                          setTypedPassword('');
+                          toast.success(`Bienvenue dans l'espace admin de ${parish.name}`);
+                        } else {
+                          toast.error("Mot de passe incorrect");
+                        }
+                      }
+                    }}
+                    placeholder="Saisissez le mot de passe..." 
+                    className="w-full p-5 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-all text-center font-bold" 
+                  />
+                </div>
+                <Button 
+                   className="w-full py-5 rounded-2xl font-black uppercase tracking-widest" 
+                   variant="accent" 
+                   onClick={() => {
+                      if (parish.password === typedPassword) {
+                        setCurrentParish(parish);
+                        setParishLoggedIn(true);
+                        setView('admin');
+                        setIsParishPasswordLock(null);
+                        setSelectedPublicParish(null);
+                        setTypedPassword('');
+                        toast.success(`Bienvenue dans l'espace admin de ${parish.name}`);
+                      } else {
+                        toast.error("Mot de passe incorrect");
+                      }
+                   }}
+                >
+                  Gérer la Paroisse
+                </Button>
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] text-slate-600 font-medium italic">Seul l'administrateur de cette paroisse possède ce code.</p>
+                  <button 
+                    onClick={() => setIsForgotParishPassword(true)}
+                    className="text-accent text-[10px] font-bold uppercase tracking-widest hover:underline"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mx-auto text-accent shadow-xl shadow-accent/10">
+                <Bell size={40} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter leading-none">Récupération</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Demander à l'administrateur</p>
+              </div>
+              <div className="space-y-6 text-left">
+                <p className="text-slate-400 text-xs leading-relaxed text-center">
+                  Si vous avez oublié le mot de passe, laissez votre contact (Email ou Phone) ci-dessous. L'administrateur recevra votre demande.
+                </p>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] ml-1">Votre Contact</label>
+                  <input 
+                    type="text" 
+                    autoFocus
+                    value={requestContact}
+                    onChange={(e) => setRequestContact(e.target.value)} 
+                    placeholder="Email ou Numéro de téléphone..." 
+                    className="w-full p-4 bg-background border border-slate-800 rounded-2xl text-white outline-none focus:border-accent transition-all text-sm font-medium" 
+                  />
+                </div>
+                <Button 
+                   className="w-full py-4 rounded-2xl font-black uppercase tracking-widest" 
+                   variant="accent" 
+                   onClick={handleRequestReset}
+                >
+                  Envoyer la demande
+                </Button>
+                <button 
+                  onClick={() => setIsForgotParishPassword(false)}
+                  className="w-full text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  Retour à la connexion
+                </button>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
+  // --- RENDER ---
   if (loading) return (
     <div className="h-screen flex items-center justify-center bg-background">
       <Toaster position="top-center" richColors />
-      <Church className="w-12 h-12 text-accent animate-pulse" />
+      <Logo className="w-16 h-16 animate-pulse" showText={false} />
     </div>
   );
+
+  // Security guard for admin view
+  if (view === 'admin' && !user && !parishLoggedIn) {
+     setView('landing');
+     return null;
+  }
 
   // 1. Consultation Publique d'une paroisse spécifique
   if (selectedPublicParish) {
     return (
       <>
         <Toaster position="top-center" richColors />
+        {isParishPasswordLock && <ParishPasswordModal parish={isParishPasswordLock} />}
         <PublicParishConsultation 
-        parish={selectedPublicParish} 
-        onBack={() => setSelectedPublicParish(null)} 
-        onAdminRequest={(p) => {
-          setCurrentParish(p);
-          setSelectedPublicParish(null);
-          setActiveTab('dashboard');
-          if (!user) {
-            setView('auth');
-          } else {
-            setView('admin');
-          }
-        }}
-        onEstechClick={() => setView('estech')}
-      />
+          parish={selectedPublicParish} 
+          onBack={() => setSelectedPublicParish(null)} 
+          onAdminRequest={(p) => {
+            if (isSuperAdmin) {
+              setCurrentParish(p);
+              setParishLoggedIn(true);
+              setView('admin');
+              setSelectedPublicParish(null);
+            } else {
+              setIsParishPasswordLock(p);
+            }
+          }}
+          onEstechClick={() => setView('estech')}
+        />
       </>
     );
   }
@@ -3176,17 +3394,12 @@ export default function App() {
           login(); // Need to be logged in to register a parish
           setIsCreatingParish(true);
         }} 
+        onBack={() => setView('landing')}
       />
       </>
     );
   }
 
-  if (!user && view === 'admin') {
-    setView('landing');
-    return null;
-  }
-
-  // 4. Inscription d'une Paroisse
   if (isCreatingParish && user) {
     return (
       <div className="h-screen flex flex-col items-center justify-center p-8 bg-background text-center relative overflow-hidden">
@@ -3381,6 +3594,13 @@ export default function App() {
      );
   }
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    setParishLoggedIn(false);
+    setCurrentParish(null);
+    setView('landing');
+  };
+
   return (
     <ParishContext.Provider value={{ currentParish, setCurrentParish, parishes }}>
       <Toaster position="top-center" richColors />
@@ -3475,6 +3695,7 @@ export default function App() {
               <button 
                 onClick={() => {
                   setCurrentParish(null);
+                  setParishLoggedIn(false);
                   setActiveTab(isSuperAdmin ? 'superadmin' : 'dashboard');
                   setIsMobileMenuOpen(false);
                 }}
@@ -3485,7 +3706,7 @@ export default function App() {
             )}
 
             <button 
-              onClick={() => signOut(auth)}
+              onClick={handleLogout}
               className="w-full flex items-center justify-center gap-3 text-slate-500 hover:text-red-400 font-bold text-sm py-3 transition-colors"
             >
               <UserCircle size={20} />
@@ -3513,7 +3734,7 @@ export default function App() {
              </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => signOut(auth)} className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800">
+            <button onClick={handleLogout} className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800">
               <UserCircle size={24} />
             </button>
           </div>
@@ -3533,6 +3754,12 @@ export default function App() {
                 <SuperAdminView 
                   parishes={parishes} 
                   onDeleteParish={deleteParish} 
+                  onEnterParish={(p) => {
+                    setCurrentParish(p);
+                    setParishLoggedIn(true);
+                    setSuperAdminParishView(true);
+                    setActiveTab('dashboard');
+                  }}
                 />
               )}
               {activeTab === 'dashboard' && currentParish && (
@@ -3577,97 +3804,135 @@ export default function App() {
                 </div>
               )}
               {activeTab === 'settings' && currentParish && (
-            <div className="space-y-8">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex flex-col gap-2">
                 <h2 className="text-3xl font-black text-white tracking-tight italic uppercase">Paramètres</h2>
-                <p className="text-slate-500 font-medium">Gérez votre paroisse et vos données.</p>
+                <p className="text-slate-500 font-medium tracking-tight">Gérez la sécurité et les informations de votre paroisse.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
-                    <Church size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold text-lg">Nouvelle Paroisse</h3>
-                    <p className="text-slate-500 text-sm mt-1">Ajoutez une autre paroisse à votre gestion.</p>
-                  </div>
-                  <Button variant="secondary" onClick={() => setIsCreatingParish(true)} className="mt-2">
-                    <Plus size={18} />
-                    Créer une paroisse
-                  </Button>
-                </Card>
-
-                <Card className="flex flex-col gap-4 border-red-500/20 bg-red-500/5">
-                  <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500">
-                    <Trash2 size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold text-lg text-red-400">Zone de Danger</h3>
-                    <p className="text-slate-500 text-sm mt-1">Actions irréversibles sur vos données.</p>
-                  </div>
-                  <div className="flex flex-col gap-3 mt-2">
-                    {currentParish && (currentParish.adminId === user?.uid || user?.email === 'mamelkmanama@gmail.com') ? (
-                      <div>
-                        {isDeletingParish === currentParish.id ? (
-                          <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl space-y-3">
-                            <p className="text-xs text-red-400 font-bold leading-tight">Confirmation : supprimer "{currentParish.name}" et tout son contenu ?</p>
-                            <div className="flex gap-2">
-                              <Button variant="accent" className="flex-1 py-2 text-xs bg-red-500 hover:bg-red-600 border-none" onClick={() => deleteParish(currentParish.id)}>Confirmer</Button>
-                              <Button variant="secondary" className="flex-1 py-2 text-xs" onClick={() => setIsDeletingParish(null)}>Annuler</Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button variant="ghost" onClick={() => setIsDeletingParish(currentParish.id)} className="text-red-400 border border-red-500/20 hover:bg-red-500/10 w-full justify-start">
-                            Supprimer la paroisse "{currentParish.name}"
-                          </Button>
-                        )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-8">
+                  {/* Password Management */}
+                  <Card className="flex flex-col gap-6 p-8 border-slate-800/40 bg-slate-900/30">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
+                        <Lock size={24} />
                       </div>
-                    ) : (
-                      <p className="text-[10px] text-slate-600 bg-slate-900/50 p-2 rounded-lg italic">
-                        Seul le créateur de cette paroisse (ou l'administrateur global) peut la supprimer.
-                      </p>
-                    )}
-                    
-                    {user?.email === 'mamelkmanama@gmail.com' && (
-                       <div>
-                         {isWipingAll ? (
-                           <div className="bg-red-500/20 border border-red-500 p-4 rounded-2xl space-y-3 mt-2">
-                             <p className="text-xs text-red-400 font-black uppercase italic tracking-tighter">ALERTE : RÉINITIALISATION TOTALE</p>
-                             <div className="flex gap-2">
-                               <Button variant="accent" className="flex-1 py-2 text-xs bg-red-600 hover:bg-red-700 border-none" onClick={wipeAllData}>RÉINITIALISER TOUT</Button>
-                               <Button variant="secondary" className="flex-1 py-2 text-xs" onClick={() => setIsWipingAll(false)}>Annuler</Button>
-                             </div>
-                           </div>
-                         ) : (
-                           <Button variant="ghost" onClick={() => setIsWipingAll(true)} className="text-red-500 border border-red-500/40 hover:bg-red-500/20 w-full justify-start font-black">
-                             RÉINITIALISER TOUTE LA BASE
-                           </Button>
-                         )}
-                       </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              <Card>
-                <h3 className="text-white font-bold mb-4">Mes Paroisses</h3>
-                <div className="space-y-2">
-                  {parishes.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-4 bg-primary/50 rounded-2xl border border-slate-800">
                       <div>
-                        <p className="text-white font-bold">{p.name}</p>
-                        <p className="text-xs text-slate-500 italic uppercase tracking-widest">{p.diocese || 'Sans diocèse'} · {p.deanery || 'Sans doyenné'}</p>
+                        <h3 className="text-white font-bold text-lg italic">Sécurité Paroissiale</h3>
+                        <p className="text-slate-500 text-xs">Modifiez le mot de passe d'accès.</p>
                       </div>
-                      <Button variant="secondary" onClick={() => { 
-                        setCurrentParish(p); 
-                        setActiveTab('dashboard');
-                        setSuperAdminParishView(false);
-                      }} className="text-xs py-1">Selectionner</Button>
                     </div>
-                  ))}
+                    
+                    <div className="space-y-4">
+                       <div className="p-4 bg-background/50 rounded-2xl border border-slate-800 space-y-1">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mot de passe actuel</p>
+                          <p className="text-white font-mono text-lg tracking-wider">{currentParish.password}</p>
+                       </div>
+
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">Nouveau mot de passe</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              value={passwordUpdateValue}
+                              onChange={(e) => setPasswordUpdateValue(e.target.value)}
+                              placeholder="Nouveau code..."
+                              className="flex-1 bg-background border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-accent transition-all text-sm"
+                            />
+                            <Button variant="accent" onClick={updateParishPassword} className="aspect-square p-0 w-12 flex justify-center items-center rounded-xl">
+                              <CheckCircle size={20} />
+                            </Button>
+                          </div>
+                       </div>
+                    </div>
+                  </Card>
+
+                  {/* Password Requests */}
+                  <Card className="flex flex-col gap-4 p-8 border-slate-800/40 bg-slate-900/30">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
+                        <Bell size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-bold text-lg italic">Demandes de code</h3>
+                        <p className="text-slate-500 text-xs text-wrap">Personnes ayant oublié le mot de passe.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mt-2">
+                      {passwordRequests.length === 0 ? (
+                        <div className="bg-slate-900/50 p-6 rounded-2xl text-center border-dashed border border-slate-800">
+                          <p className="text-xs text-slate-600 font-bold uppercase tracking-widest leading-loose">Aucune demande en attente</p>
+                        </div>
+                      ) : (
+                        passwordRequests.map(req => (
+                          <div key={req.id} className="flex items-center justify-between p-4 bg-background/50 rounded-2xl border border-slate-800 animate-in fade-in slide-in-from-right-4">
+                            <div className="space-y-1">
+                              <p className="text-white font-bold text-sm tracking-tight">{req.contact}</p>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+                                {req.createdAt ? format(req.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'À l\'instant'}
+                              </p>
+                            </div>
+                            <button onClick={() => deletePasswordRequest(req.id)} className="p-2 text-slate-600 hover:text-red-500 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </Card>
                 </div>
-              </Card>
+
+                <div className="space-y-8">
+                  <Card className="flex flex-col gap-4 p-8 border-slate-800/40 opacity-80">
+                    <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
+                      <Church size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-lg">Nouvelle Paroisse</h3>
+                      <p className="text-slate-500 text-sm mt-1">Gérez une autre communauté avec le même compte.</p>
+                    </div>
+                    <Button variant="secondary" onClick={() => setIsCreatingParish(true)} className="mt-2 py-4 rounded-xl">
+                      <Plus size={18} />
+                      Ajouter une paroisse
+                    </Button>
+                  </Card>
+
+                  <Card className="flex flex-col gap-4 p-8 border-red-500/20 bg-red-500/5">
+                    <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500">
+                      <Trash2 size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-lg text-red-400">Zone de Danger</h3>
+                      <p className="text-slate-500 text-sm mt-1">Actions irréversibles sur votre paroisse.</p>
+                    </div>
+                    <div className="flex flex-col gap-3 mt-2">
+                       {currentParish && (currentParish.adminId === user?.uid || user?.email === 'mamelkmanama@gmail.com') ? (
+                        <div>
+                          {isDeletingParish === currentParish.id ? (
+                            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl space-y-3">
+                              <p className="text-xs text-red-400 font-bold leading-tight">Voulez-vous vraiment supprimer "{currentParish.name}" ?</p>
+                              <div className="flex gap-2">
+                                <Button variant="accent" className="flex-1 py-2 text-xs bg-red-500 hover:bg-red-600 border-none" onClick={() => deleteParish(currentParish.id)}>Confirmer</Button>
+                                <Button variant="secondary" className="flex-1 py-2 text-xs" onClick={() => setIsDeletingParish(null)}>Annuler</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button variant="ghost" onClick={() => setIsDeletingParish(currentParish.id)} className="text-red-400 border border-red-500/20 hover:bg-red-500/10 w-full justify-start py-4 rounded-xl">
+                              Supprimer la paroisse
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-600 bg-slate-900/50 p-4 rounded-xl italic leading-relaxed">
+                          Seul le créateur de cette paroisse peut la supprimer définitivement.
+                        </p>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              </div>
             </div>
           )}
         </motion.div>
