@@ -251,3 +251,30 @@ export const generatePlanningPDF = (
   doc.save(`Planning_${mass.title.replace(/\s+/g, '_')}_${format(parseISO(mass.date), 'yyyyMMdd')}.pdf`);
 };
 
+export const generateReaderListPDF = (readers: Reader[], parishName: string) => {
+  const doc = new jsPDF();
+  doc.setFontSize(22);
+  doc.setTextColor(245, 158, 11);
+  doc.text('Leitourghia - Liste des Lecteurs', 20, 20);
+
+  doc.setFontSize(12);
+  doc.setTextColor(100);
+  doc.text(`Paroisse: ${parishName}`, 20, 30);
+
+  const tableData = readers.map(r => [
+    `${r.prenom} ${r.name.toUpperCase()}`,
+    r.postnom || '',
+    r.phone || 'N/A',
+    r.trainingStatus === 'completed' ? 'Formé' : 'En cours'
+  ]);
+
+  autoTable(doc, {
+    startY: 40,
+    head: [['Prénom', 'Nom', 'Contact', 'Statut Formation']],
+    body: tableData,
+    theme: 'striped',
+    headStyles: { fillColor: [15, 23, 42] as any },
+  });
+
+  doc.save(`Liste_Lecteurs_${parishName.replace(/\s+/g, '_')}.pdf`);
+};
