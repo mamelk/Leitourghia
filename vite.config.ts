@@ -7,32 +7,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Force le nettoyage des anciens caches pour éviter les erreurs 404 persistantes
-      workbox: {
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
-        // Exclut les fichiers qui posent problème au déploiement
-        navigateFallbackDenylist: [/^\/api/], 
-      },
-      devOptions: {
-        enabled: true
-      },
+      // On retire les options complexes pour un build standard
       manifest: {
         name: 'Leitourghia',
         short_name: 'Leitourghia',
         theme_color: '#f59e0b',
         icons: [
-          {
-            src: '/logo192.png', // Doit être à la racine de public/
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/logo512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
+          { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/logo512.png', sizes: '512x512', type: 'image/png' }
         ]
       }
     })
